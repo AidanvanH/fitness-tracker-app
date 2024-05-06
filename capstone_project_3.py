@@ -1,18 +1,12 @@
 import sqlite3
 from sqlite3 import IntegrityError
 
+
 db = sqlite3.connect('fitness_tracker_app')
 cur = db.cursor()
 
-category_lst = []       # List that stores all exercise category names
-category_ids = []       # List that stores all exercise category id's
-categories_and_exercises_dict = {}  # Stores the categories as keys and the exercises as values
-all_exercises_lst = []      # List that stores all exercises across all exercise categories
 exercises_in_routine = []  # This holds all the exercise names the user adds to their workout routine
-routine_lst = []    # This will hold the exercise routines of a particular exercise category
-routine_lst_all = []    # Encapsulates all routines. Will be used later to check if user indeed has routines
-workout_routine_names = []      # List that stores workout routine names
-workout_descriptions_lst = []   # List that stores the workout descriptions for each exercise from workout routine table
+exercise_count = 0         # Variable that keeps track of how many exercises are left in a user's category
 
 # Initializing classes for various sqlite3 tables
 class ExerciseCategory:
@@ -33,12 +27,6 @@ class ExerciseCategory:
         cur.execute('''SELECT * FROM exercise_category''')
         for row in cur:
             print(row[1])  
-
-    # Appends each exercise category's name to list
-    def lst_all_categories():
-        cur.execute('''SELECT exercise_category_name FROM exercise_category''')
-        for row in cur:
-            category_lst.append(row[0])
 
     # Fetches the exercise category's id and returns it
     def retrieve_category_id(category):
@@ -64,31 +52,7 @@ class Exercise:
     def execute(new_exercise, exercise_cat):
         cur.execute('''INSERT INTO exercises(exercise_name, exercise_category_id) VALUES(?,?)''',
                     (new_exercise, exercise_cat))
-        db.commit()
-
-    # Method that creates keys for exercise categories and values for their exercises 
-    def populate_dict(exercise_category):
-        for i in category_lst:
-            cur.execute('''SELECT exercise_category_id FROM exercise_category WHERE
-                        exercise_category_name=?''', (i,))
-            convert_id = int(''.join(map(str, cur.fetchone()))) # Fetches the category's id
-            categories_and_exercises_dict[i] = None     # Initialises dictionary with 'None' values
-            cur.execute('''SELECT exercise_name FROM exercises WHERE exercise_category_id=?''', (convert_id,))
-            # Fetches the category exercises as values and stores them in the appropriate key
-            categories_and_exercises_dict[i] = cur.fetchall()   
-
-    # Method that prints out an exercise category's exercises
-    def print_exercise_categories(exercise_category):
-        for i in category_lst:
-            cur.execute('''SELECT exercise_category_id FROM exercise_category WHERE
-                        exercise_category_name=?''', (i,))
-            convert_id = int(''.join(map(str, cur.fetchone()))) # Fetches the category's id
-            categories_and_exercises_dict[i] = None
-            cur.execute('''SELECT exercise_name FROM exercises WHERE exercise_category_id=?''', (convert_id,))
-            categories_and_exercises_dict[i] = cur.fetchall()
-            # Prints out category's exercises
-        for x in categories_and_exercises_dict[exercise_category]:
-            print(x[0])
+        db.commit() 
 
     # Deletes an exercise that the user chooses from exercises table
     def delete(delete_exercise_by_category):
@@ -102,40 +66,19 @@ class Exercise:
                     (category_id,))
         db.commit()
 
-    # Appends all exercises in the exercise table to list
-    def all_exercises():
-        cur.execute('''SELECT exercise_name FROM exercises''')
-        for e in cur:
-            all_exercises_lst.append(e)
-
-    # Appends all exercises from a specified exercise category to list
-    def all_category_exercises(exercise_cat, lst):
-        cur.execute('''SELECT exercise_name FROM exercises
-                    WHERE exercise_category_id=?''', (exercise_cat,))
-        for e in cur:
-            lst.append(e)
-
 class WorkoutRoutine:   
 
     # Creates a table for the workout routine
     def create_table():     
         cur.execute('''CREATE TABLE IF NOT EXISTS workout_routine
-                    (workout_routine_name TEXT, workout_routine_exercise TEXT, 
-                    workout_description TEXT, exercise_category_id)''')
-        
-    # Inserts workout routines into table
-    def execute_workout_routine(routine_name, routine_exercises, routine_description, exercise_routine_id):      
-        cur.execute('''INSERT INTO workout_routine(workout_routine_name, workout_routine_exercise,
-                    workout_description, exercise_category_id) VALUES (?,?,?,?)''', 
-                    (routine_name, routine_exercises, routine_description, exercise_routine_id))
-        db.commit()
+                    (workout_routine_id INTEGER PRIMARY KEY, workout_routine_name TEXT, 
+                    workout_routine_exercise TEXT, workout_description TEXT, exercise_category_id)''')
 
-    # Prints out the exercises from a particular workout routine
-    def view_workout_routine_exercises(routine_name):
-        cur.execute('''SELECT workout_routine_exercise FROM workout_routine WHERE
-                    workout_routine_name=?''', (routine_name,))
-        for r in cur:
-            print(r[0])
+    def insert_workout_routine(routine_name, exercise, exercise_routine_id):
+        cur.execute('''INSERT INTO workout_routine(workout_routine_name, workout_routine_exercise,
+                    exercise_category_id) VALUES(?,?,?)''',
+                    (routine_name, exercise, exercise_routine_id))
+        db.commit()
 
     # Prints out the exercises and its descriptions from a particular workout routine
     def view(exercise_name):    
@@ -143,56 +86,6 @@ class WorkoutRoutine:
                     WHERE workout_routine_name=?''', (exercise_name,))
         for j in cur:
             print(j[0], '-', j[1])
-    
-    # Appends workout routine names from table into list
-    def workout_routine_lst_names(category_id):
-        lst = []
-        cur.execute('''SELECT workout_routine_name FROM workout_routine
-                    WHERE exercise_category_id=?''', (category_id,))
-        # Prevents duplicate workout routine names from being appended to list
-        for routine_name in cur:
-            if not routine_name in lst:
-                lst.append(routine_name[0])
-        for i in lst:
-            if not i in workout_routine_names:
-                workout_routine_names.append(i)
-
-    # Appends the exercises from a particular workout routine to list
-    def exercises_in_routine(routine):
-        cur.execute('''SELECT workout_routine_exercise FROM 
-                    workout_routine WHERE workout_routine_name=?''',
-                    (routine,))
-        for exercise in cur: 
-            exercises_in_routine.append(exercise[0])
-
-    # Appends workout routine name from workout routine based on exercise category's id
-    def lst_of_routines(exercise_id):
-        cur.execute('''SELECT workout_routine_name FROM workout_routine
-                    WHERE exercise_category_id=?''', (exercise_id,))
-        for r in cur:
-            routine_lst.append(r[0])
-
-    # Appends all workout routine names to list
-    def all_routines():
-        cur.execute('''SELECT * FROM workout_routine''')
-        for routine in cur:
-            routine_lst_all.append(routine[0])
-
-    # Prints out the workout description of a particular exercise in a workout routine
-    def print_exercise_description(routine, exercise):
-        cur.execute('''SELECT workout_description FROM workout_routine 
-                    WHERE workout_routine_name=? AND workout_routine_exercise=?''', 
-                    (routine, exercise))
-        for exercise in cur:
-            print(exercise[0])
-    
-    # Appends the exercise descriptions of a particular workout routine to list
-    def description_list(routine):
-         cur.execute('''SELECT workout_description FROM workout_routine 
-                    WHERE workout_routine_name=?''',
-                    (routine,))
-         for i in cur:
-             workout_descriptions_lst.append(i[0].split('\n'))
         
     # Updates exercises workout description of a particular workout routine
     def update_workout_description(new_description, routine, exercise):
@@ -202,15 +95,9 @@ class WorkoutRoutine:
         db.commit()
 
     # Deletes workout routine 
-    def delete_workout_routine(delete_routine):
-        cur.execute('''DELETE FROM workout_routine WHERE workout_routine_name=?''',
-                    (delete_routine,))
-        db.commit()
-
-    # Deletes exercise from workout routine
-    def delete_exercise(exercise):
-        cur.execute('''DELETE FROM workout_routine WHERE
-                    workout_routine_exercise=?''', (exercise,))
+    def delete_workout_routine(delete_routine, exercise_category_id):
+        cur.execute('''DELETE FROM workout_routine WHERE workout_routine_name=?
+                    AND exercise_category_id=?''', (delete_routine, exercise_category_id))
         db.commit()
 
     # Deletes workout routine
@@ -225,29 +112,28 @@ class WorkoutRoutine:
                     AND workout_routine_exercise=?''', (routine_name, routine_exercise))
         db.commit()
 
-class CreateWorkout:      
+class CreateWorkout:      # ADD ADDITIONAL FUNCTIONALITIES TO CLASS TO ALLOW IT TO ALLOW IT TO UPDATE WORKOUT ROUTINES (SEE OPTION 10)
 
     # The following method allows users to select their own parameters for the workout routines they make
-    def choose_own_param(exercises):      # List of all exercises the user aims to include in workout routine
+    def choose_own_param(exercise):      # List of all exercises the user aims to include in workout routine
 
         str_of_description_info = ''    # String to hold each exercises descriptions
         start = True        
         while start:
 
-            for exercise in exercises:
-                advance = True
-                while advance:
-                    print('''
+            advance = True
+            while advance:
+                print('''
 Enter 1 to add new parameter to your workout for ''' + exercise + '''
 Enter 2 to move on once you're done picking
 ''')
-                    select = input('Enter the command you would like to do: ')
+                select = input('Enter the command you would like to do: ')
 
-                    if select == '1':
+                if select == '1':
 
-                        select_option = True
-                        while select_option:
-                            print('''
+                    select_option = True
+                    while select_option:
+                        print('''
 Please select the number that relates to the parameter of your choosing
 1 - Sets
 2 - Reps
@@ -257,225 +143,270 @@ Please select the number that relates to the parameter of your choosing
 6 - Time structure
 7 - Additional info
 ''')
-                            option = input('Enter the command you wish to do: ')
+                        option = input('Enter the command you wish to do: ')
 
-                            if option == '1':
+                        if option == '1':
 
-                                add_description = True
-                                while add_description:
-                                    sets = input(f'Enter the number of sets you would like for {exercise}: ')   # Once this is all sorted, replace 'this exercise' with the name of the exercise
-                                    if sets.strip == '':
-                                        print('Invalid')
-                                    else:
-                                        # Adds the description of exercises final set to empty string
-                                        final_sets = f'The number of sets for this {exercise} is: {sets}'
-                                        str_of_description_info += final_sets + '\n'
-                                        add_description = False
-                                        select_option = False
+                            add_description = True
+                            while add_description:
+                                sets = input(f'Enter the number of sets you would like for {exercise}: ')   # Once this is all sorted, replace 'this exercise' with the name of the exercise
+                                if sets.strip == '':
+                                    print('Invalid')
+                                else:
+                                    # Adds the description of exercises final set to empty string
+                                    final_sets = f'The number of sets for this {exercise} is: {sets}'
+                                    str_of_description_info += final_sets + '\n'
+                                    add_description = False
+                                    select_option = False
 
-                            elif option == '2':
+                        elif option == '2':
 
-                                add_description = True
-                                while add_description:
-                                    reps = input(f'Enter the number of reps you would like for {exercise}: ')
-                                    if reps.strip() == '':
-                                        print('Invalid')
-                                    else:
-                                        # Adds the description of exercises final reps to empty string
-                                        final_reps = f'The number of reps you have for {exercise} is: {reps}'
-                                        str_of_description_info += final_reps + '\n'
-                                        add_description = False
-                                        select_option = False
+                            add_description = True
+                            while add_description:
+                                reps = input(f'Enter the number of reps you would like for {exercise}: ')
+                                if reps.strip() == '':
+                                    print('Invalid')
+                                else:
+                                    # Adds the description of exercises final reps to empty string
+                                    final_reps = f'The number of reps you have for {exercise} is: {reps}'
+                                    str_of_description_info += final_reps + '\n'
+                                    add_description = False
+                                    select_option = False
 
-                            elif option == '3':
+                        elif option == '3':
 
-                                add_description = True
-                                while add_description:
-                                    weight = input(f'Enter the amount of weight you would like for {exercise}: ')
-                                    if weight.strip() == '':
-                                        print('Invalid')
-                                    else:
-                                        # Adds the description of exercises final weight to empty string
-                                        final_weight = f'The amount of weight you\'re using for {exercise} is: {weight}'
-                                        str_of_description_info += final_weight + '\n'
-                                        add_description = False
-                                        select_option = False
+                            add_description = True
+                            while add_description:
+                                weight = input(f'Enter the amount of weight you would like for {exercise}: ')
+                                if weight.strip() == '':
+                                    print('Invalid')
+                                else:
+                                    # Adds the description of exercises final weight to empty string
+                                    final_weight = f'The amount of weight you\'re using for {exercise} is: {weight}'
+                                    str_of_description_info += final_weight + '\n'
+                                    add_description = False
+                                    select_option = False
 
-                            elif option == '4':
+                        elif option == '4':
 
-                                add_description = True
-                                while add_description:
-                                    time = input(f'Enter the amount of time you would like to spend on {exercise}: ')
-                                    if time.strip() == '':
-                                        print('Invalid')
-                                    else:
-                                        # Adds the description of exercises final time to empty string
-                                        final_time = f'The total time you are spending on {exercise} is: {time}'
-                                        str_of_description_info += final_time + '\n'
-                                        add_description = False
-                                        select_option = False
+                            add_description = True
+                            while add_description:
+                                time = input(f'Enter the amount of time you would like to spend on {exercise}: ')
+                                if time.strip() == '':
+                                    print('Invalid')
+                                else:
+                                    # Adds the description of exercises final time to empty string
+                                    final_time = f'The total time you are spending on {exercise} is: {time}'
+                                    str_of_description_info += final_time + '\n'
+                                    add_description = False
+                                    select_option = False
 
-                            elif option == '5':
+                        elif option == '5':
 
-                                add_description = True
-                                while add_description:
-                                    distance = input(f'Enter the distance you wish to cover for {exercise}: ')
-                                    if distance.strip() == '':
-                                        print('Invalid')
-                                    else:
-                                        # Adds the description of exercises final distance to empty string
-                                        final_distance = f'The total distance you are covering for {exercise} is: {distance}'
-                                        str_of_description_info += final_distance + '\n'
-                                        add_description = False
-                                        select_option = False
+                            add_description = True
+                            while add_description:
+                                distance = input(f'Enter the distance you wish to cover for {exercise}: ')
+                                if distance.strip() == '':
+                                    print('Invalid')
+                                else:
+                                    # Adds the description of exercises final distance to empty string
+                                    final_distance = f'The total distance you are covering for {exercise} is: {distance}'
+                                    str_of_description_info += final_distance + '\n'
+                                    add_description = False
+                                    select_option = False
 
-                            elif option == '6':
+                        elif option == '6':
 
-                                add_description = True
-                                while add_description:
-                                    time_structure = input(f'Enter the time structure you would like to use for {exercise}: ')
-                                    if time_structure.strip() == '':
-                                        print('Invalid')
-                                    else:
-                                        # Adds the description of exercises time structure to empty string
-                                        final_time_structure = f'The time structure that you are using for {exercise} is: {time_structure}'
-                                        str_of_description_info += final_time_structure + '\n'
-                                        add_description = False
-                                        select_option = False
+                            add_description = True
+                            while add_description:
+                                time_structure = input(f'Enter the time structure you would like to use for {exercise}: ')
+                                if time_structure.strip() == '':
+                                    print('Invalid')
+                                else:
+                                    # Adds the description of exercises time structure to empty string
+                                    final_time_structure = f'The time structure that you are using for {exercise} is: {time_structure}'
+                                    str_of_description_info += final_time_structure + '\n'
+                                    add_description = False
+                                    select_option = False
 
-                            elif option == '7':
+                        elif option == '7':
 
-                                add_description = True
-                                while add_description:
-                                    additional_info = input(f'Enter any additional information you would like to add for {exercise}: ')
-                                    if additional_info.strip() == '':
-                                        print('Invalid')
-                                    else:
-                                        # Adds the additional information for the exercise to empty string
-                                        final_info = f'Additional information that was added is: {additional_info}'
-                                        str_of_description_info += final_info + '\n'
-                                        add_description = False
-                                        select_option = False
-                            else:
-                                print('Invalid')
-                
-                    elif select == '2':
-                        WorkoutRoutine.execute_workout_routine(routine_name, exercise, str_of_description_info, category_id)  
-                        exercises.remove(exercise)  # Removes the current exercise from for loop and moves on
+                            add_description = True
+                            while add_description:
+                                additional_info = input(f'Enter any additional information you would like to add for {exercise}: ')
+                                if additional_info.strip() == '':
+                                    print('Invalid')
+                                else:
+                                    # Adds the additional information for the exercise to empty string
+                                    final_info = f'Additional information that was added is: {additional_info}'
+                                    str_of_description_info += final_info + '\n'
+                                    add_description = False
+                                    select_option = False
+                        else:
+                            print('Invalid')
+            
+                elif select == '2':     # SEE IF YOU CAN HAVE AN IDENTIFIER, IF YOU'RE COMING FROM OPTION 7 (CREATING A WORKOUT ROUTINE, USE ID 1 FOR INSTANCE), IF YOU'RE COMING FROM UPDATING A WORKOUT ROUTINE (ADDING OR CHANGING) USE ANOTHER IDENTIFIER. THESE IDENTIFIERS WILL ALTER THE LOGIC THAT IS APPLIED TO THIS CLASS
+                    if str_of_description_info.strip() != '':
+                        # From here on out, just execute an update cur call, regardless of whether user is updating a an existent exercise or not.
+                        WorkoutRoutine.update_workout_description(str_of_description_info, routine_name, exercise)
                         str_of_description_info = ''    # Emptying the string for next exercise
-                        if exercises == []:     # Exits loop if there are no more exercises in for loop
-                            advance = False
-                            start = False
-                        elif exercises != []:
-                            advance = False     # Repeats process if there are more exercises in for loop
+                        advance = False
+                        start = False
                     else:
-                        print('Invalid')
+                        print('You need to insert parameters for the exercises you choose')
+                else:
+                    print('Invalid')
 
 class FitnessGoal:  
 
     # Creates a table for the fitness goal
     def create_table():
         cur.execute('''CREATE TABLE IF NOT EXISTS fitness_goal
-                    (fitness_goal_id INTEGER PRIMARY KEY, fitness_goal_input TEXT UNIQUE,
-                    fitness_goal_achieve_date TEXT, fitness_goal_progress TEXT,
-                    fitness_goal_progress_date TEXT, fitness_goal_exercise_category INTEGER)''')
+                    (fitness_goal_id INTEGER PRIMARY KEY, fitness_goal_exercise, 
+                    fitness_goal_input TEXT UNIQUE, fitness_goal_achieve_date TEXT, 
+                    fitness_goal_progress TEXT, fitness_goal_progress_date TEXT, 
+                    fitness_goal_exercise_category INTEGER)''')
         
     # Inserts user's fitness goals into table
-    def insert_into_goal(fitness_goal_insert, fitness_goal_date, fitness_goal_category_id):
-        cur.execute('''INSERT INTO fitness_goal(fitness_goal_input, fitness_goal_achieve_date,
-                    fitness_goal_exercise_category) VALUES (?,?,?)''', 
-                    (fitness_goal_insert, fitness_goal_date, fitness_goal_category_id))
+    def insert_into_goal(fitness_goal_exercise, fitness_goal_insert, fitness_goal_date, fitness_goal_category_id):
+        cur.execute('''INSERT INTO fitness_goal(fitness_goal_exercise, fitness_goal_input, 
+                    fitness_goal_achieve_date, fitness_goal_exercise_category) VALUES (?,?,?,?)''', 
+                    (fitness_goal_exercise, fitness_goal_insert, fitness_goal_date, fitness_goal_category_id))
         db.commit()
         
     # Inserts user's progress towards fitness goal
     def insert_into_goal_progress(fitness_goal_progress_input, fitness_goal_progress_date_input, fitness_goal_id):
-        cur.execute('''UPDATE fitness_goal SET
-                    fitness_goal_progress=?,
+        cur.execute('''UPDATE fitness_goal 
+                    SET fitness_goal_progress=?,
                     fitness_goal_progress_date=?
                     WHERE fitness_goal_exercise_category=?''',
                     (fitness_goal_progress_input, fitness_goal_progress_date_input, fitness_goal_id))
         db.commit()
         
-    # Prints out all the details relating to a fitness goal
-    def view_fitness_goal(id_input):
-        cur.execute('''SELECT fitness_goal_input, fitness_goal_achieve_date, fitness_goal_progress,
-                    fitness_goal_progress_date FROM fitness_goal WHERE fitness_goal_exercise_category=?''',
-                    (id_input,))
-        for f in cur:
-            final = f'Your fitness goal is: {f[0]}\nYour achieve date is: {f[1]}\nYour last progress input is: {f[2]}\nYour last progress date is: {f[3]}'
-        print(final)
-
-    # This method will ensure that the user is only granted access to the fitness goals table once a 
-    # fitness goal has been set 
-    def view_fitness_goal_category():
-        cur.execute('''SELECT fitness_goal_exercise_category FROM fitness_goal''')
-        for f in cur:
-            category_ids.append(f[0])
-
-    # Updates the user's progress towards fitness goal
-    def update_goal_progress_all(update_goal, new_date, category_id):
-        cur.execute('''UPDATE fitness_goal SET 
-                    fitness_goal_input=?,
-                    fitness_goal_achieve_date=?
-                    WHERE fitness_goal_exercise_category=?''',
-                    (update_goal, new_date, category_id))
-        db.commit()
-        
     # Updates the fitness goal that the user has set
     def update_goal(update_goal, category_id):
-        cur.execute('''UPDATE fitness_goal SET fitness_goal_input=?
+        cur.execute('''UPDATE fitness_goal 
+                    SET fitness_goal_input=?
                     WHERE fitness_goal_exercise_category=?''',
                     (update_goal, category_id))
         db.commit()
 
-    # Updates the fitness goal's desired achieve date
-    def update_goal_date(new_date, category_id):
-        cur.execute('''UPDATE fitness_goal SET fitness_goal_achieve_date=?
-                    WHERE fitness_goal_exercise_category=?''',
-                    (new_date, category_id))
+    def update_and_overwrite(updated_health_goal, fitness_goal_id, updated_goal_progress=None, updated_progress_date=None):
+        cur.execute('''UPDATE fitness_goal_health
+                    SET fitness_goal_input=?,
+                    fitness_goal_progress=?,
+                    fitness_goal_progress_date=?
+                    WHERE fitness_goal_id=?''',
+                    (updated_health_goal, updated_goal_progress, updated_progress_date, fitness_goal_id))
         db.commit()
 
     # Deletes exercise category's fitness goal
     def delete_fitness_goal(fitness_id):
-        cur.execute('''DELETE from fitness_goal WHERE fitness_goal_exercise_category=?''',
+        cur.execute('''DELETE FROM fitness_goal WHERE fitness_goal_exercise_category=?''',
                     (fitness_id,))
         db.commit()
 
-    # Prints out an exercise category's fitness goal
-    def print_fitness_goal(id_cat):
-        cur.execute('''SELECT fitness_goal_input FROM fitness_goal
-                    WHERE fitness_goal_exercise_category=?''',
-                    (id_cat,))
-        for i in cur:
-            print(i[0])
+    def delete(fitness_id):
+        cur.execute('''DELETE FROM fitness_goal WHERE fitness_goal_id=?''',
+                    (fitness_id,))
+        db.commit()
+
+    def print_out_selection():
+        cur.execute('''SELECT fitness_goal_id, fitness_goal_exercise, fitness_goal_input
+                    FROM fitness_goal''')
+        for row in cur:
+            print(row[0], '-', row[1], '-', row[2])
+
+class FitnessGoalHealth:
+
+    def create_table():
+        cur.execute('''CREATE TABLE IF NOT EXISTS fitness_goal_health
+                    (fitness_goal_id INTEGER PRIMARY KEY, 
+                    fitness_goal_input TEXT, fitness_goal_progress TEXT, fitness_goal_end_date TEXT, 
+                    fitness_goal_progress_date TEXT)''')
+        
+    def insert_into_goal(fitness_goal_input, fitness_goal_progress_date):
+        cur.execute('''INSERT INTO fitness_goal_health 
+                    (fitness_goal_input, fitness_goal_end_date) VALUES (?,?)''', 
+                    (fitness_goal_input, fitness_goal_progress_date))
+        db.commit()
+
+    def insert_into_goal_progress(fitness_goal_progress, fitness_goal_progress_date, fitness_goal_id):
+        cur.execute('''UPDATE fitness_goal_health 
+                    SET fitness_goal_progress=?,
+                    fitness_goal_progress_date=?
+                    WHERE fitness_goal_id=?''',
+                    (fitness_goal_progress, fitness_goal_progress_date, fitness_goal_id))
+        db.commit()
+
+    def update_health_goal(updated_health_goal, fitness_goal_id):
+        cur.execute('''UPDATE fitness_goal_health
+                    SET fitness_goal_input=?
+                    WHERE fitness_goal_id=?''',
+                    (updated_health_goal, fitness_goal_id))
+        
+    def update_and_overwrite(updated_health_goal, fitness_goal_id, updated_goal_progress=None, updated_progress_date=None):
+        cur.execute('''UPDATE fitness_goal_health
+                    SET fitness_goal_input=?,
+                    fitness_goal_progress=?,
+                    fitness_goal_progress_date=?
+                    WHERE fitness_goal_id=?''',
+                    (updated_health_goal, updated_goal_progress, updated_progress_date, fitness_goal_id))
+        db.commit()
+
+    def update_target_date(updated_target_date, fitness_goal_id):
+        cur.execute('''UPDATE fitness_goal_health
+                    SET fitness_goal_end_date=?
+                    WHERE fitness_goal_id=?''',
+                    (updated_target_date, fitness_goal_id))
+        db.commit()
+        
+    def print_out_selection():
+        cur.execute('''SELECT * FROM fitness_goal_health''')
+        for row in cur:
+            print(row[1], '-', row[2], '-', row[3], '-', row[4])
+
+    def delete_goal(goal_id):
+        cur.execute('''DELETE FROM fitness_goal_health
+                    WHERE fitness_goal_id=?''', (goal_id,))
+        db.commit()
 
 # Section for user input
+
+# MAYBE BEFORE YOU START WORKING ON THE APP, RUN ALL THE create_table() functions
+
+ExerciseCategory.create_table()
+Exercise.create_table()
+WorkoutRoutine.create_table()
+FitnessGoal.create_table()
+FitnessGoalHealth.create_table()
+
+
 while True:
 
     option = input('''
 Select an option:
-1.  Add exercise category
-2.  View all exercise categories
-3.  Delete exercise category
-4.  Add exercise by category
-5.  View exercise by category
-6.  Delete exercise by category
+1.  Add Exercise Category
+2.  View all Exercise Categories
+3.  Delete Exercise Category
+4.  Add Exercise by Category
+5.  View Exercise by Category
+6.  Delete Exercise by Category
 7.  Create Workout Routine 
 8.  View Workout Routine
 9.  View Exercise Progress
 10. Update Workout Routine
 11. Delete Workout Routine 
-12. Set Fitness Goal (one per category)
-13. Insert Progress towards Fitness Goals
-14. View Fitness Goals by Category
-15. Update Fitness Goals
-16. Delete Fitness Goal by Category
+12. Set Fitness Goal
+13. Insert Progress towards Fitness Goal    
+14. View Fitness Goal
+15. Update Fitness Goal 
+16. Delete Fitness Goal
 17. Quit
 ''')    
 
-    if option == '1':
 
-        ExerciseCategory.create_table()
+    if option == '1':
 
         while True:
             try:
@@ -494,26 +425,30 @@ Select an option:
 
     elif option == '2':
 
-        # Populates the category list. Prevents access to users that have no exercise categories
-        ExerciseCategory.lst_all_categories()
-        if category_lst == []:
-            print('You have no exercise categories')
-        else:
+        # Counts all the exercise categories from exercise_category table
+        cur.execute('''SELECT COUNT(*) FROM exercise_category''')
+        # Fetches the result
+        results = cur.fetchone()
+        if results[0] > 0:
             print('You have the following exercise categories:')
             ExerciseCategory.view_all_categories()  
-            category_lst.clear()     # Clears the list so no duplicate values are present
+        else:
+            print('You have no exercise categories')
 
     elif option == '3':
 
-        ExerciseCategory.lst_all_categories()       # Fetches all the exercise category names from table
-        if category_lst == []:  # Checks to see if the user has made exercises categories
-            print('You have no exercise categories')
-        else:
+        # Counts all the exercise categories from exercise_category table
+        cur.execute('''SELECT COUNT(*) FROM exercise_category''')
+        results = cur.fetchone()
+        if results[0] > 0:
             print('You have the following exercise categories:')
             ExerciseCategory.view_all_categories()
             while True:
                 delete_category = input('Which exercise category would you like to delete: ')
-                if delete_category in category_lst: # Checks to see if the category exists
+                cur.execute('''SELECT COUNT(*) FROM exercise_category WHERE exercise_category_name=?''',
+                            (delete_category,))
+                category_result = cur.fetchone()
+                if category_result[0] > 0:
                     # Retrieves category id of the exercise category
                     cat_id = ExerciseCategory.retrieve_category_id(delete_category)
                     # Deleted categories fitness goal if it has one
@@ -525,25 +460,24 @@ Select an option:
                     # Deletes category if exist
                     ExerciseCategory.delete(delete_category) 
                     print('Exercise category successfully removed')
-                    category_lst.clear()    # Clears the remaining items from the list so there are no duplicates
                     break
                 else:
                     print('Exercise category does not exist')
+        else:
+            print('You have no exercise categories')
 
     elif option == '4':
 
-        Exercise.create_table()     # Creates the exercises table
-        ExerciseCategory.lst_all_categories()   # Fetches all the exercise category names from table
-
-        if category_lst == []:
-            print('You have no exercise categories!') 
-            print('You need to create exercise categories before adding exercises')
-        else:
+        # Counts all the exercise categories from exercise_category table
+        cur.execute('''SELECT COUNT(*) FROM exercise_category''')
+        results = cur.fetchone()
+        if results[0] > 0:
             while True:
                 which_category = input('Which exercise will this category belong to: ')
-                if which_category not in category_lst:  # Checks to see if exercise category exists
-                    print('Exercise category does not exist')
-                else:
+                cur.execute('''SELECT COUNT(*) FROM exercise_category WHERE exercise_category_name=?''',
+                            (which_category,))
+                category_result = cur.fetchone()
+                if category_result[0] > 0:  # Checks to see if exercise category exists
                     while True:
                     # Retrieving the inserted exercise's category id
                         category_id = ExerciseCategory.retrieve_category_id(which_category) 
@@ -556,898 +490,1025 @@ Select an option:
                             else:
                                 # Inserts the new exercise and category id into exercises table
                                 Exercise.execute(exercise, category_id)
-                                category_lst.clear() # SEE IF THIS IS NEEDED, IF YES PROVIDE A COMMENT
                                 print('Exercise successfully saved')
                                 break
                         except IntegrityError:  # Prevents identical exercises from being saved to database
                             print('Exercise already exists')
                     break
+                else:
+                    print('Exercise category does not exist')
+        else:
+            print('You have no exercise categories!') 
+            print('You need to create exercise categories before adding exercises')
 
     elif option == '5':    
 
-        ExerciseCategory.lst_all_categories()       # Fetches all the exercise category names from table
-        Exercise.all_exercises()    # Fetches all the exercise names from the exercises table
-        exercises_lst = []      # List for all exercise category's exercise names
-
-        if category_lst == []:
-            print('You have no exercise categories')
-        elif all_exercises_lst == []:
-            print('You have not created any exercises')
-        else:
-            while True:
-                which_input = input('Which exercise category?: ')
-                if not which_input in category_lst:
-                    print('Exercise category does not exist')
-                else:
-                    # Retrieves the exercise category's id
-                    cat_id = ExerciseCategory.retrieve_category_id(which_input)
-                    # Fetches the exercise category's exercise names and appends it list
-                    Exercise.all_category_exercises(cat_id, exercises_lst)
-                    # Prints appropriate message if category has no exercises
-                    if exercises_lst == []:
-                        print('Exercise category has no exercises')
-                    else:
-                        print('You have the following exercises in the ' + which_input + ' category:\n')
-                        # Displays all exercises under the inserted category
-                        Exercise.print_exercise_categories(which_input) 
-                        category_lst.clear()
-                        break
-                
-    elif option == '6':     # Another thing to add, if user deletes exercise and the exercise is in a workout routine, delete the exercise from the workout routine
-        
-        ExerciseCategory.lst_all_categories()   # Fetches all the exercise category names from table
-        Exercise.all_exercises()
-        lst = []
-
-        if category_lst == []:
-            print('You have no exercise categories!')
-        elif all_exercises_lst == []:
-            print('You have not created any exercises')
-        else:
-            category_condition = True
-            while category_condition:
-                which_input_to_del = input('Which exercise category do you want to delete from?: ')
-                if not which_input_to_del in category_lst:
-                    print('Exercise category does not exist')
-                else:
-                    exercise_condition = True
-                    while exercise_condition:
-                        # Populates dictionary with key-value pairs consisting of categories and their exercises
-                        Exercise.populate_dict(which_input_to_del) 
-                        # Checks to see if the category has exercises assigned to it
-                        all_exercises = categories_and_exercises_dict[which_input_to_del]
-                        if all_exercises == []:
-                            print('Category has no exercises')
-                            exercise_condition = False  
-                        else:
-                            print('These are the exercises you currently have in the ' + which_input_to_del + ' category:')
-                            # Prints out exercises from the chosen category
-                            Exercise.print_exercise_categories(which_input_to_del)
-                            which_exercise_to_del = input('Which exercise do you wish to delete: ')
-                            # Fills list with all exercises related to the chosen category
-                            for y in categories_and_exercises_dict[which_input_to_del]:
-                                lst.append(y[0])
-                                # Checks to see if the exercise to delete exists
-                            if which_exercise_to_del in lst:   
-                                # Removes exercise from workout routine if present in routine
-                                WorkoutRoutine.delete_exercise(which_exercise_to_del)
-                                # Deletes the exercise that the user selects
-                                Exercise.delete(which_exercise_to_del)  
-                                print(which_exercise_to_del + ' was successfully deleted')
-                                category_lst.clear()
-                                exercise_condition = False
-                                category_condition = False
-                            else:
-                                print('Exercise does not exist\n')
-
-    elif option == '7':     
-
-        WorkoutRoutine.create_table()       # Creates the workout routine's table
-        ExerciseCategory.lst_all_categories()   # Fetches all the exercise category names from table    
-        Exercise.all_exercises()
-
-        category_exercises = [] # Holds the exercises of the category that the user chooses
-        if category_lst == []:
-            print('You have no exercise categories!')
-        elif all_exercises_lst == []:
-            print('You have not created any exercises')
-        else:
-            routine_category = True
-            while routine_category:
-                workout_routine_category = input('Which workout category will this routine belong to: ')
-                if not workout_routine_category in category_lst:
-                    print('Exercise category does not exist')
-                else:
-                     # Stores the category's exercises in dictionary 
-                    Exercise.populate_dict(workout_routine_category)   
-                    for x in categories_and_exercises_dict[workout_routine_category]:
-                        category_exercises.append(x[0])     # Fetches category's exercises and appends them to list
-                    if category_exercises == []:   
-                        print('Exercise category has no exercises. You need to create exercises before routines')
-                    else:
-                        name = True
-                        while name:
-                            # Retrieving category id
-                            category_id = ExerciseCategory.retrieve_category_id(workout_routine_category)
-                            # Appends workout routine names from workout_routine table into workout_routine_names
-                            WorkoutRoutine.workout_routine_lst_names(category_id)
-                            routine_name = input('Give this routine a name: ')
-                            if routine_name.strip() == '':
-                                print('Invalid input')
-                            elif routine_name in workout_routine_names:     # Prevents duplicate routine names
-                                print('Workout routine name already exists')
-                            else:
-                                add_exercise = True 
-                                while add_exercise:
-                                    command = ''
-                                    print('These are the exercises you have in the ' + workout_routine_category + ' category:\n')
-                                    # Prints out the exercises in the chosen workout routine
-                                    Exercise.print_exercise_categories(workout_routine_category)
-                                    which_exercise = input('\nWhich exercise would you like to add to your routine: ').strip()
-                                    if which_exercise in exercises_in_routine:
-                                        print('Exercise already added to routine\n')    # Prevents duplicate values from being entered
-                                    elif not which_exercise in category_exercises:
-                                        print('Exercise does not exist')
-                                    else:
-                                        # Appends exercise to list
-                                        exercises_in_routine.append(which_exercise) 
-                                        category_exercises.remove(which_exercise)
-                                        program = True   
-                                        while program:
-                                            print('''
-Enter 1 to enter more exercises to your workout routine
-Enter 2 to move on''')
-                                            try:
-                                                command = int(input('> '))
-                                            except ValueError:
-                                                print('Only numbers please')
-                                            if command == 1 and category_exercises == []:
-                                                print('You have no exercises left to add to the routine')
-                                                continue
-                                            elif command == 1 and category_exercises != []:
-                                                break
-                                            elif command == 2:
-                                                # Calls the choose_own_param method for users to select exercise parameters for their chosen exercise
-                                                CreateWorkout.choose_own_param(exercises_in_routine)
-                                                print(f'{routine_name} successfully saved')
-                                                exercises_in_routine.clear()
-                                                program = False
-                                                add_exercise = False
-                                                name = False
-                                                routine_category = False
-                                            else:
-                                                print('Invalid')
-    elif option == '8': 
-        
-        ExerciseCategory.lst_all_categories()       # Fetches all the exercise category names from table
-        WorkoutRoutine.all_routines()       # Appends all workout routines to routines_all_lst
-        unique_list = []
-
-        if category_lst == []:
-            print('You have no exercise categories')
-        elif routine_lst_all == []:
-            print('You have no workout routines')
-        else:
-            # Used to prevent program from breaking if inserted category has no workout routine 
-            exercise_category = True
-            while exercise_category:
-                which = input('Enter the workout category you would like to view: ')    
-                if not which in category_lst:
-                    print('Exercise category does not exist')
-                else:
-                    workout_routine = True
-                    while workout_routine:
-                        ex_id = ExerciseCategory.retrieve_category_id(which)
-                        WorkoutRoutine.lst_of_routines(ex_id)
-                        if routine_lst == []:
-                            print('Exercise category has no workout routines')
+        # Counts all the exercise categories from exercise_category table
+        cur.execute('''SELECT COUNT(*) FROM exercise_category''')
+        results = cur.fetchone()
+        if results[0] > 0:
+            # Counts all the exercises from exercises table
+            cur.execute('''SELECT COUNT(*) FROM exercises''')
+            # Fetches the results
+            exercises_results = cur.fetchone()
+            if exercises_results[0] > 0:
+                while True:
+                    which_input = input('Which exercise category would you like to display?: ')
+                    cur.execute('''SELECT COUNT(*) FROM exercise_category WHERE exercise_category_name=?''',
+                                (which_input,))
+                    category_result = cur.fetchone()
+                    if category_result[0] > 0:
+                        # Retrieves the exercise category's id
+                        cat_id = ExerciseCategory.retrieve_category_id(which_input)
+                        cur.execute('''SELECT COUNT(*) FROM exercises WHERE exercise_category_id=?''',
+                                    (cat_id,))
+                        id_result = cur.fetchone()
+                        if id_result[0] > 0:
+                            cur.execute('''SELECT exercise_name FROM exercises WHERE exercise_category_id=?''',
+                                        (cat_id,))
+                            print(f'You have the following exercises in the {which_input} category:')
+                            for row in cur:
+                                print(row[0])
                             break
                         else:
-                            print(f'These are the following workout routines you have in the {which} category:')
-                            for i in routine_lst:
-                                if not i in unique_list:
-                                    unique_list.append(i)   # Only appends unique routines to list
-                            print(*unique_list, sep='\n')   # Prints out items from list without loop
-                            input_routine = input('\nType in the workout routine you would like to view: ')
-                            if not input_routine in routine_lst:
-                                print('Workout routine does not exist')
-                                routine_lst.clear()
+                            print('Exercise category does not have any exercises')
+                    else:
+                        print('Exercise category does not exist')
+            else:
+                print('You have not created any exercises')
+        else:
+            print('You have not created any exercise categories')
+
+    elif option == '6':     # Add more while loops so that the program doesn't restart the while loop after each invalid input
+
+        # Counts all the exercise categories from exercise_category table
+        cur.execute('''SELECT COUNT(*) FROM exercise_category''')
+        results = cur.fetchone()
+        if results[0] > 0:
+            # Counts all the exercises from exercises table
+            cur.execute('''SELECT COUNT(*) FROM exercises''')
+            exercises_results = cur.fetchone()
+            if exercises_results[0] > 0:
+                while True:
+                    exercise_category = input('Which exercise category would you want to delete from?: ')
+                    # Checks to see if exercise category exists in table
+                    cur.execute('''SELECT COUNT(*) FROM exercise_category WHERE exercise_category_name=?''',
+                                (exercise_category,))
+                    # Fetches the result
+                    category_result = cur.fetchone()
+                    if category_result[0] > 0:
+                        # Retrieves the exercise category's id
+                        exercise_category_id = ExerciseCategory.retrieve_category_id(exercise_category)
+                        # Counts all exercises from table with matching category id's
+                        cur.execute('''SELECT COUNT(*) FROM exercises WHERE exercise_category_id=?''',
+                                    (exercise_category_id,))
+                        # Fetches the result
+                        category_results_count = cur.fetchone()
+                        if category_results_count[0] > 0:
+                            while True:
+                                exercise = input('Which exercise would you like to delete: ')
+                                # Checks to see if exercise exists in table
+                                cur.execute('''SELECT COUNT(*) FROM exercises WHERE exercise_name=?''',
+                                            (exercise,))
+                                # Fetches result
+                                exercise_result = cur.fetchone()
+                                if exercise_result[0] > 0:
+                                    # Deletes exercise if does exist
+                                    Exercise.delete(exercise)
+                                    print(f'{exercise} was deleted from database')
+                                    break
+                                else:
+                                    print(f'The exercise {exercise} does not exist in the {exercise_category} category')
+                            break
+                        else:
+                            print(f'There are no exercises in the {exercise_category} category')
+                    else:
+                        print('Exercise category does not exist')
+            else:
+                print('You have not created any exercises')
+        else:
+            print('You have not created any exercise categories')
+
+    elif option == '7':     # THINK ABOUT DELETING THE count VARIABLE, AND INSTEAD USE THE enumerate FUNCTION TO GET THE TOTAL NUMBER OF EXERCISES IN THE WORKOUT ROUTINE. THIS MAY REDUCE THE AMOUNT OF CODE YOU WRITE
+
+        # Counts all the exercise categories from exercise_category table
+        cur.execute('''SELECT COUNT(*) FROM exercise_category''')
+        results = cur.fetchone()
+        if results[0] > 0:
+            # Counts all the exercises from exercises table
+            cur.execute('''SELECT COUNT(*) FROM exercises''')
+            exercises_results = cur.fetchone()
+            if exercises_results[0] > 0:
+                while True:
+
+                    workout_routine_category = input('Which category will this workout routine belong to: ')
+                    # Checks to see if workout routine exists
+                    cur.execute('''SELECT COUNT(*) FROM exercise_category WHERE exercise_category_name=?''',
+                                (workout_routine_category,))
+                    category_results = cur.fetchone()
+                    if category_results[0] > 0:
+                        category_id = ExerciseCategory.retrieve_category_id(workout_routine_category)
+                        # Checks to see if there are exercises in exercise category
+                        cur.execute('''SELECT COUNT(*) FROM exercises WHERE exercise_category_id=?''',
+                                    (category_id,))
+                        # Fetches the result
+                        is_exercises = cur.fetchone()
+                        if is_exercises[0] > 0:
+                            while True:
+
+                                routine_name = input('''Give this workout routine a name: ''')
+                                if routine_name.strip() != '' or routine_name.isalpha():
+                                    cur.execute('''SELECT COUNT(*) FROM workout_routine WHERE workout_routine_name=?
+                                                AND exercise_category_id=?''', (routine_name, category_id))
+                                    routine_result = cur.fetchone()
+                                    if routine_result[0] == 0:
+                                        while True:
+
+                                            add = input('''
+1.  Enter new exercise into workout routine
+2.  Quit, once you\'ve added at least one exercise to workout routine
+''')
+                                    
+                                            if add == '1':
+                                                while True:
+                                                    exercise = input('Which exercise would you like to add to this workout routine: ')
+                                                    cur.execute('''SELECT COUNT(*) FROM exercises WHERE exercise_name=?
+                                                                AND exercise_category_id=?''',
+                                                                (exercise, category_id))
+                                                    exercise_exists = cur.fetchone()
+                                                    if exercise_exists[0] > 0:
+                                                        if exercise not in exercises_in_routine:
+                                                            WorkoutRoutine.insert_workout_routine(routine_name, exercise, category_id)
+                                                            CreateWorkout.choose_own_param(exercise)
+                                                            exercises_in_routine.append(exercise)
+                                                            break
+                                                        else:
+                                                            print('Exercise already exists in workout routine')
+                                                            break
+                                                    else:
+                                                        print(f'Exercise doesn\'t exist in {workout_routine_category} category')
+                                                
+                                            elif add == '2':
+                                                cur.execute('''SELECT COUNT(*) FROM workout_routine WHERE workout_routine_name=?
+                                                            AND exercise_category_id=?''', (routine_name, category_id))
+                                                exists = cur.fetchone()
+                                                if exists[0] > 0:
+                                                    break
+                                                else:
+                                                    print('You have to select at least one exercise for your workout routine')
+                                            else:
+                                                print('Invalid option')
+                                        break
+                                    else:
+                                        print(f'Workout routine name already exists in the {workout_routine_category} category. Choose another name')
+                                else:
+                                    print('Invalid input')
+                            break
+                        else:
+                            print('Exercise category does not contain any exercise. Add exercises before creating a workout routine.')
+                    else:
+                        print('Exercise category does not exist')
+            else:
+                print('You have not created any exercises')
+        else:
+            print('You have not created any exercise categories')
+
+    elif option == '8': 
+
+        # Counts all the exercise categories from exercise_category table
+        cur.execute('''SELECT COUNT(*) FROM exercise_category''')
+        results = cur.fetchone()
+        if results[0] > 0:
+            # Counts all the exercises from exercises table
+            cur.execute('''SELECT COUNT(*) FROM exercises''')
+            exercises_results = cur.fetchone()
+            if exercises_results[0] > 0:
+                # Counts all the workout routines from the workout routine's table
+                cur.execute('''SELECT COUNT(*) FROM workout_routine''')
+                # Fetches the result
+                all_routines = cur.fetchone()
+                if all_routines[0] > 0:
+                    while True:
+
+                        category = input('Which exercise category does the workout routine belong to: ')
+                        # Checks to see if the exercise category exists
+                        cur.execute('''SELECT COUNT(*) FROM exercise_category WHERE exercise_category_name=?''',
+                                    (category,))
+                        category_result = cur.fetchone()
+                        if category_result[0] > 0:
+                            exercise_category_id_result = ExerciseCategory.retrieve_category_id(category)
+                            print(exercise_category_id_result)
+                            # Checks to see if the exercise category has workout routines 
+                            cur.execute('''SELECT COUNT(*) FROM workout_routine WHERE exercise_category_id=?''',
+                                        (exercise_category_id_result,))
+                            has_routines = cur.fetchone()
+                            if has_routines[0] > 0:
+                            
+                                while True:
+
+                                    print(f'You have the following workout routines in the {category} category: ')
+                                    cur.execute('''SELECT workout_routine_name FROM workout_routine
+                                                WHERE exercise_category_id=?''', (exercise_category_id_result,))
+                                    for row in cur:
+                                        print(row[0])
+                                    view_workout_routine = input('Which workout routine do you wish to view: ')
+                                    cur.execute('''SELECT COUNT(*) FROM workout_routine WHERE workout_routine_name=?
+                                                AND exercise_category_id=?''', (view_workout_routine, exercise_category_id_result))
+                                    workout_routine_result = cur.fetchone()
+                                    if workout_routine_result[0] > 0:
+                                        WorkoutRoutine.view(view_workout_routine)
+                                        break
+                                    else:
+                                        print('Invalid. Workout routine does not exist')
+                                break
                             else:
-                                print()
-                                WorkoutRoutine.view(input_routine)
-                                category_lst.clear()    
-                                routine_lst.clear()
-                                workout_routine = False
-                                exercise_category = False
+                                print(f'{category} category has no workout routines')
+                        else:
+                            print('Exercise category does not exist')
+                else:
+                    print('You have not created a workout routine yet')
+            else:
+                print('You have not created any exercises')
+        else:
+            print('You have not created any exercise categories')
 
     elif option == '9':
 
-        ExerciseCategory.lst_all_categories()       # Fetches all the exercise category names from table
-        WorkoutRoutine.all_routines()       # Appends all workout routines to routines_all_lst
-        unique_list2 = []
-        lst_of_completed_exercises = [] 
+         # Counts all the exercise categories from exercise_category table
+        cur.execute('''SELECT COUNT(*) FROM exercise_category''')
+        results = cur.fetchone()
+        if results[0] > 0:
+            # Counts all the exercises from exercises table
+            cur.execute('''SELECT COUNT(*) FROM exercises''')
+            exercises_results = cur.fetchone()
+            if exercises_results[0] > 0:
+                # Counts all the workout routines from the workout routine's table
+                cur.execute('''SELECT COUNT(*) FROM workout_routine''')
+                all_routines = cur.fetchone()
+                if all_routines[0] > 0:
+                    while True:
+                        category = input('Which exercise category does the workout routine belong to: ')
+                        # Checks to see if the exercise category exists
+                        cur.execute('''SELECT COUNT(*) FROM exercise_category WHERE exercise_category_name=?''',
+                                    (category,))
+                        category_result = cur.fetchone()
+                        if category_result[0] > 0:
+                            exercise_category_id_result = ExerciseCategory.retrieve_category_id(category)
+                            print(exercise_category_id_result)
+                            # Checks to see if the exercise category has workout routines 
+                            cur.execute('''SELECT COUNT(*) FROM workout_routine WHERE exercise_category_id=?''',
+                                        (exercise_category_id_result,))
+                            has_routines = cur.fetchone()
+                            if has_routines[0] > 0:
+                                while True:
 
-        if category_lst == []:
-            print('You have no exercise categories')
-        elif routine_lst_all == []:
-            print('You have no workout routines')
-        else:
-            category_condition = True
-            while category_condition:
-                category_input = input('Which exercise category are you currently busy with: ')
-                if not category_input in category_lst:
-                    print('Exercise category does not exist')
-                else:
-                    routine_condition = True
-                    while routine_condition:
-                        category_id = ExerciseCategory.retrieve_category_id(category_input)
-                        WorkoutRoutine.lst_of_routines(category_id)
-                        if routine_lst == []:
-                            print('Exercise category has no routines')
-                            break
-                        else:
-                            for i in routine_lst:
-                                if not i in unique_list2:
-                                    unique_list2.append(i)
-                            print(*unique_list2, sep='\n')   # Prints out the items in routine_lst
-                            routine_name = input('Which of the above exercise routines are you doing?: ') 
-                            if not routine_name in routine_lst:
-                                print('Routine name does not exist')
-                                routine_lst.clear() # Prevents routines being repeatedly added to list
-                            else:
-                                WorkoutRoutine.exercises_in_routine(routine_name)
-                                command_input = ''
-                                while command_input != '2':
-                                    print('''
-Enter the command you wish to do:
-1: To add completed exercises
-2: To quit, once all completed exercises have been added
+                                    print(f'You have the following workout routines in the {category} exercise category: ')
+                                    # Prints out all the workout routines that the user has in exercise category
+                                    cur.execute('''SELECT workout_routine_name FROM workout_routine
+                                                WHERE exercise_category_id=?''', (exercise_category_id_result,))
+                                    for row in cur:
+                                        print(row[0])
+                                    routine = input('Which routine are you currently busy with: ')
+                                    # Checks to see if workout routine exists in the specified exercise category
+                                    cur.execute('''SELECT COUNT(*) FROM workout_routine WHERE workout_routine_name=?
+                                                AND exercise_category_id=?''', (routine, exercise_category_id_result))
+                                    routine_result = cur.fetchone()
+                                    if routine_result[0] > 0:
+                                        while True:
+
+                                            print(f'You have the following exercises in the {routine} workout routine:')
+                                            cur.execute('''SELECT workout_routine_exercise FROM workout_routine
+                                                        WHERE workout_routine_name=? AND exercise_category_id=?''',
+                                                        (routine, exercise_category_id_result))
+                                            for index, exercises in enumerate(cur, start=1):
+                                                print(index, exercises[0])
+
+                                            completed = input(f'''
+1.  Enter 1 to add exercise you\'ve completed from {routine} workout routine
+2.  Enter 2 once you\'ve added all completed exercises from {routine} workout routine
 ''')
-                                    command_input = input('Enter the command you wish to do: ')
-                                    if command_input == '1':
-                                        while True: 
-                                            # Takes user back if there are no exercises left to mark off
-                                            if exercises_in_routine == []:
-                                                print('You have no more exercises left in workout routine')
+                                            if completed == '1':    # Make sure user can't add duplicate exercises!!!       ALSO ANOTHER IDEA COULD BE TO USE NUMBERS AS INDEXES FOR EXERCISE SO THAT USERS DON'T HAVE TO TYPE IN THE EXERCISE IN FULL ONCE THEY'VE COMPLETED IT, THEY ONLY NEED TO TYPE IN THE NUMBER ASSOCIATED WITH THE EXERCISE
+                                                while True:
+                                                    completed_exercise = input('Which exercise have you completed: ')
+                                                    cur.execute('''SELECT COUNT(*) FROM workout_routine WHERE
+                                                                workout_routine_name=? AND workout_routine_exercise=?
+                                                                AND exercise_category_id=?''', (routine, completed_exercise, exercise_category_id_result))
+                                                    exercise_result = cur.fetchone()
+                                                    if exercise_result[0] > 0:
+                                                        if not completed_exercise in exercises_in_routine:
+                                                            exercises_in_routine.append(completed_exercise)
+                                                            print(f'{completed_exercise} marked off as complete')
+                                                            # Increment count variable by one
+                                                            exercise_count += 1
+                                                            break
+                                                        else:
+                                                            print('Exercise already marked off as complete')
+                                                            break
+                                                    else:
+                                                        print('Exercise does not exist')
+                                            elif completed == '2':
+                                                cur.execute('''SELECT workout_routine_exercise, workout_description
+                                                            FROM workout_routine WHERE workout_routine_name=?
+                                                            AND exercise_category_id=?''', (routine, exercise_category_id_result))
+                                                for exercise in cur:
+                                                    if not exercise[0] in exercises_in_routine:
+                                                        print(exercise[0], '-', exercise[1])
+                                                exercises_in_routine.clear()
+                                                exercise_count = 0
                                                 break
-                                            else:   
-                                                WorkoutRoutine.view_workout_routine_exercises(routine_name)
-                                                completed_exercise = input('Which of the above exercise have you completed in the ' + category_input + ' category: ')   # PRINT OUT THE EXERCISE NAMES FOR THE USER TO MAKE IT EASIER TO REMEMBER
-                                                if not completed_exercise in exercises_in_routine and completed_exercise in lst_of_completed_exercises:
-                                                    print('Exercise already marked off as complete')
-                                                    break
-                                                if not completed_exercise in exercises_in_routine and not completed_exercise in lst_of_completed_exercises:
-                                                    print('Exercise doesn\'t exist in the ' + category_input + ' category')
-                                                else:
-                                                    exercises_in_routine.remove(completed_exercise)
-                                                    lst_of_completed_exercises.append(completed_exercise)
-                                                    break
-                                    elif command_input == '2':
-                                        print('You have the following exercises in the ' + routine_name + ' exercise routine:')
-                                        print()
-                                        if exercises_in_routine == []:
-                                            print('You have completed your workout. Great job')
-                                            routine_condition = False
-                                            category_condition = False
-                                        else:
-                                            for routine in exercises_in_routine:
-                                                print(routine)
-                                                WorkoutRoutine.print_exercise_description(routine_name, routine)
-                                            exercises_in_routine.clear()
-                                            routine_lst.clear() 
-                                            routine_condition = False
-                                            category_condition = False
+                                            if exercise_count == index:
+                                                print('You have completed your workout. Well done')
+                                                exercise_count = 0
+                                                break
+                                        break
                                     else:
-                                        print('Invalid option')   
+                                        print('Workout routine does not exist')
+                                break
+                            else:
+                                print(f'{category} category has no workout routines')
+                        else:
+                            print('Exercise category does not exist')
+                else:
+                    print('You have not created a workout routine yet')
+            else:
+                print('You have not created any exercises')
+        else:
+            print('You have not created any exercise categories')
 
     elif option == '10':
         
-        ExerciseCategory.lst_all_categories()  # Fetches all the exercise category names from exercise category table
-        WorkoutRoutine.all_routines()       # Appends all workout routines to routines_all_lst
-        lst_of_exercise_names = []  # Stores the exercise names from exercise category
-        descrip_info = []   # Stores the description information of new exercises for workout routine
-        final_str = ''      # Will be used to gather each parameter's description for new exercise 
-        lst = []        # Holds the exercise the user wishes to update
-        description_info = ''   # String to hold all the updated exercise description
-        
-        if category_lst == []:
-            print('You have no exercise categories')
-        elif routine_lst_all == []:
-            print('You have no workout routines')
-        else:
-            category = True
-            while category:
-                workout_routine_category = input('Which exercise category does the workout routine that you want to update belong to: ')
-                if not workout_routine_category in category_lst:
-                    print('Exercise category does not exist')
-                else:
-                    category_id = ExerciseCategory.retrieve_category_id(workout_routine_category)
-                    WorkoutRoutine.lst_of_routines(category_id)
-                    if routine_lst == []:
-                        print('Exercise category has no routines')
-                    else:
-                        workout_routine = True
-                        while workout_routine:
-                            WorkoutRoutine.workout_routine_lst_names(category_id)
-                            print('You have the following workout routines in the ' + workout_routine_category + ' category:')
-                            # Prints out workout routines from exercise category
-                            print(*workout_routine_names, sep='\n')
-                            routine_name = input('Which routine do you want to update: ')
-                            if not routine_name in workout_routine_names:
-                                print('Workout routine does not exist')
-                            else:
-                                exercises = True
-                                while exercises:     # Find out which list to use as parameter
-                                    change = input('''
+        # Counts all the exercise categories from exercise_category table
+        cur.execute('''SELECT COUNT(*) FROM exercise_category''')
+        results = cur.fetchone()
+        if results[0] > 0:
+            # Counts all the exercises from exercises table
+            cur.execute('''SELECT COUNT(*) FROM exercises''')
+            exercises_results = cur.fetchone()
+            if exercises_results[0] > 0:
+                # Counts all the workout routines from the workout routine's table
+                cur.execute('''SELECT COUNT(*) FROM workout_routine''')
+                all_routines = cur.fetchone()
+                if all_routines[0] > 0:
+                    while True:
+                        category = input('Which exercise category does the workout routine belong to: ')
+                        # Checks to see if the exercise category exists
+                        cur.execute('''SELECT COUNT(*) FROM exercise_category WHERE exercise_category_name=?''',
+                                    (category,))
+                        category_result = cur.fetchone()
+                        if category_result[0] > 0:
+                            exercise_category_id_result = ExerciseCategory.retrieve_category_id(category)
+                            print(exercise_category_id_result)
+                            # Checks to see if the exercise category has workout routines 
+                            cur.execute('''SELECT COUNT(*) FROM workout_routine WHERE exercise_category_id=?''',
+                                        (exercise_category_id_result,))
+                            has_routines = cur.fetchone()
+                            if has_routines[0] > 0:
+                                while True:
+
+                                    print(f'You have the following workout routines in the {category} exercise category: ')
+                                    # Prints out all the workout routines that the user has in exercise category
+                                    cur.execute('''SELECT workout_routine_name FROM workout_routine
+                                                WHERE exercise_category_id=?''', (exercise_category_id_result,))
+                                    for row in cur:
+                                        print(row[0])
+                                    routine_name = input('Which routine do you want to update: ')
+                                    # Checks to see if workout routine exists in the specified exercise category
+                                    cur.execute('''SELECT COUNT(*) FROM workout_routine WHERE workout_routine_name=?
+                                                AND exercise_category_id=?''', (routine_name, exercise_category_id_result))
+                                    routine_result = cur.fetchone()
+                                    if routine_result[0] > 0:
+                                        change_routine = True
+                                        while change_routine:
+
+
+                                            change = input('''
 Enter 1 if you wish to add an exercise to an existing workout routine
-Enter 2 if you wish to replace an exercise's description 
-Enter 3 if you wish to delete an exercise and its description
+Enter 2 if you wish to change an exercise's description 
+Enter 3 if you wish to delete an exercise from an existing workout routine
 ''')
+                                            if change == '1':
+                                                # Counting all the exercise in exercise category id
+                                                cur.execute('''SELECT COUNT(*) FROM exercises WHERE
+                                                            exercise_category_id=?''', 
+                                                            (exercise_category_id_result,))
+                                                all_exercises = cur.fetchone()
+                                                # Counting all the exercises user has in workout routine
+                                                cur.execute('''SELECT COUNT(*) FROM workout_routine WHERE
+                                                            workout_routine_name=?''', (routine_name,))
+                                                routine_exercises = cur.fetchone()
+                                                # Proceeds if user has exercise remaining to add to workout routine
+                                                if all_exercises[0] != routine_exercises[0]:
+                                                    while True:
 
-                                    if change == '1': 
-
-                                        while True:
-                                            Exercise.populate_dict(workout_routine_category)
-                                            # Appends exercise names from exercise category to list
-                                            for i in categories_and_exercises_dict[workout_routine_category]:
-                                                lst_of_exercise_names.append(i[0])
-                                            # Will be used to check if the exercise the user inputs already exists in workout routine
-                                            WorkoutRoutine.exercises_in_routine(routine_name)
-                                            # Prints out all the exercises in category
-                                            Exercise.print_exercise_categories(workout_routine_category)
-                                            which_to_add = input(f'Which of the above exercises do you want to add to the {routine_name} workout routine: ')
-                                            if not which_to_add in lst_of_exercise_names:
-                                                print('Exercise does not exist in exercise category')
-                                            elif which_to_add in exercises_in_routine:
-                                                print('Exercise already in workout routine')
-                                                exercises_in_routine.clear()
-                                            else:
-                                                advance = True
-                                                while advance:
-                                                    print('''
-Enter 1 to add new parameter to your workout for ''' + which_to_add + '''
-Enter 2 to move on once you're done picking
-''')
-                                                    select = input('Enter the command you would like to do: ')
-
-                                                    if select == '1':
-
-                                                        select_option = True
-                                                        while select_option:
-                                                            print('''
-Please select the number that relates to the parameter of your choosing
-1 - Sets
-2 - Reps
-3 - Weight
-4 - Total time
-5 - Distance
-6 - Time structure
-7 - Additional info
-''')
-                                                            option = input('Enter the command you wish to do: ')
-
-                                                            if option == '1':
-
-                                                                add_description = True
-                                                                while add_description:
-                                                                    sets = input(f'Enter the number of sets you would like for {which_to_add}: ')   # Once this is all sorted, replace 'this exercise' with the name of the exercise
-                                                                    if sets.strip == '':
-                                                                        print('Invalid')
-                                                                    else:
-                                                                        # Appends the description of final_sets to list
-                                                                        final_sets = f'The number of sets for this {which_to_add} is: {sets}'
-                                                                        descrip_info.append(final_sets)
-                                                                        add_description = False
-                                                                        select_option = False
-
-                                                            elif option == '2':
-
-                                                                add_description = True
-                                                                while add_description:
-                                                                    reps = input(f'Enter the number of reps you would like for {which_to_add}: ')
-                                                                    if reps.strip() == '':
-                                                                        print('Invalid')
-                                                                    else:
-                                                                        # Appends the description of final_reps to list
-                                                                        final_reps = f'The number of reps you have for {which_to_add} is: {reps}'
-                                                                        descrip_info.append(final_reps)
-                                                                        add_description = False
-                                                                        select_option = False
-
-                                                            elif option == '3':
-
-                                                                add_description = True
-                                                                while add_description:
-                                                                    weight = input(f'Enter the amount of weight you would like for {which_to_add}: ')
-                                                                    if weight.strip() == '':
-                                                                        print('Invalid')
-                                                                    else:
-                                                                        # Appends the description of final_weight to list
-                                                                        final_weight = f'The amount of weight you\'re using for {which_to_add} is: {weight}'
-                                                                        descrip_info.append(final_weight)
-                                                                        add_description = False
-                                                                        select_option = False
-
-                                                            elif option == '4':
-
-                                                                add_description = True
-                                                                while add_description:
-                                                                    time = input(f'Enter the amount of time you would like to spend on {which_to_add}: ')
-                                                                    if time.strip() == '':
-                                                                        print('Invalid')
-                                                                    else:
-                                                                        # Appends the description of final_time to list
-                                                                        final_time = f'The total time you are spending on {which_to_add} is: {time}'
-                                                                        descrip_info.append(final_time)
-                                                                        add_description = False
-                                                                        select_option = False
-
-                                                            elif option == '5':
-
-                                                                add_description = True
-                                                                while add_description:
-                                                                    distance = input(f'Enter the distance you wish to cover for {which_to_add}: ')
-                                                                    if distance.strip() == '':
-                                                                        print('Invalid')
-                                                                    else:
-                                                                        # Appends the description of final_distance to list
-                                                                        final_distance = f'The total distance you are covering for {which_to_add} is: {distance}'
-                                                                        descrip_info.append(final_distance)
-                                                                        add_description = False
-                                                                        select_option = False
-
-                                                            elif option == '6':
-
-                                                                add_description = True
-                                                                while add_description:
-                                                                    time_structure = input(f'Enter the time structure you would like to use for {which_to_add}: ')
-                                                                    if time_structure.strip() == '':
-                                                                        print('Invalid')
-                                                                    else:
-                                                                        # Appends the description of time_structure to list
-                                                                        final_time_structure = f'The time structure that you are using for {which_to_add} is: {time_structure}'
-                                                                        descrip_info.append(final_time_structure)
-                                                                        add_description = False
-                                                                        select_option = False
-
-                                                            elif option == '7':
-
-                                                                add_description = True
-                                                                while add_description:
-                                                                    additional_info = input(f'Enter any additional information you would like to add for {which_to_add}: ')
-                                                                    if additional_info.strip() == '':
-                                                                        print('Invalid')
-                                                                    else:
-                                                                        # Appends the additional information to list
-                                                                        final_info = f'Additional information that was added is: {additional_info}'
-                                                                        descrip_info.append(final_info)
-                                                                        add_description = False
-                                                                        select_option = False
+                                                        exercise = input('Which exercise would you like to add to this workout routine: ')
+                                                        cur.execute('''SELECT COUNT(*) FROM exercises WHERE exercise_name=?
+                                                                    AND exercise_category_id=?''',
+                                                                    (exercise, exercise_category_id_result))
+                                                        exercise_exists = cur.fetchone()
+                                                        if exercise_exists[0] > 0:
+                                                            cur.execute('''SELECT COUNT(*) FROM workout_routine 
+                                                                        WHERE workout_routine_name=? AND workout_routine_exercise=?''',
+                                                                        (routine_name, exercise))
+                                                            new_exercise = cur.fetchone()
+                                                            if new_exercise[0] == 0:
+                                                                WorkoutRoutine.insert_workout_routine(routine_name, exercise, exercise_category_id_result)
+                                                                CreateWorkout.choose_own_param(exercise)
+                                                                # Breaks out of outer loop
+                                                                change_routine = False
+                                                                break
                                                             else:
-                                                                print('Invalid')
-                
-                                                    elif select == '2':
-                                                        for descrip in descrip_info:
-                                                            final_str += descrip + '\n'
-                                                        # Adds the new exercise and its description to workout routine table
-                                                        WorkoutRoutine.execute_workout_routine(routine_name, which_to_add, final_str, category_id)
-                                                        select_option = False
-                                                        advance = False
-                                                        exercises = False
-                                                        workout_routine = False
-                                                        category = False
-                                                    else:
-                                                        print('Invalid')
-                                                break
-
-                                    elif change == '2':
-
-                                        print(f'You have the following exercises in the {routine_name} category:')
-                                        WorkoutRoutine.view_workout_routine_exercises(routine_name)   
-                                        WorkoutRoutine.exercises_in_routine(routine_name)
-                                        update = input('Which exercise in the routine do you wish to update: ')
-                                        if not update in exercises_in_routine:
-                                            print('Exercise does not exist in workout routine')
-                                        else:
-                                            lst.append(update)
-                                            exercise_to_update = True
-                                            while exercise_to_update:
-                                                print(f'The following is the exercise description you have for {update}:\n')
-                                                a = WorkoutRoutine.print_exercise_description(routine_name, update) 
-                                                print('''
-Enter 1 to add new parameter to your workout for ''' + update + '''
-Enter 2 to move on once you're done picking
-''')
-                                                select = input('Enter the command you would like to do: ')
-
-                                                if select == '1':
-
-                                                    select_option = True
-                                                    while select_option:
-                                                        print('''
-Please select the number that relates to the parameter of your choosing
-1 - Sets
-2 - Reps
-3 - Weight
-4 - Total time
-5 - Distance
-6 - Time structure
-7 - Additional info
-''')
-                                                        option = input('Enter the command you wish to do: ')
-
-                                                        if option == '1':
-
-                                                            add_description = True
-                                                            while add_description:
-                                                                sets = input(f'Enter the number of sets you would like for {update}: ')   # Once this is all sorted, replace 'this exercise' with the name of the exercise
-                                                                if sets.strip == '':
-                                                                    print('Invalid')
-                                                                else:
-                                                                    # Adds the description of final_sets to string
-                                                                    final_sets = f'The number of sets for this {update} is: {sets}'
-                                                                    description_info += final_sets + '\n'
-                                                                    add_description = False
-                                                                    select_option = False
-
-                                                        elif option == '2':
-
-                                                            add_description = True
-                                                            while add_description:
-                                                                reps = input(f'Enter the number of reps you would like for {update}: ')
-                                                                if reps.strip() == '':
-                                                                    print('Invalid')
-                                                                else:
-                                                                    # Adds the description of final_reps to string
-                                                                    final_reps = f'The number of reps you have for {update} is: {reps}'
-                                                                    description_info += final_reps + '\n'
-                                                                    add_description = False
-                                                                    select_option = False
-
-                                                        elif option == '3':
-
-                                                            add_description = True
-                                                            while add_description:
-                                                                weight = input(f'Enter the amount of weight you would like for {update}: ')
-                                                                if weight.strip() == '':
-                                                                    print('Invalid')
-                                                                else:
-                                                                    # Adds the description of final_weight to string
-                                                                    final_weight = f'The amount of weight you\'re using for {update} is: {weight}'
-                                                                    description_info += final_weight + '\n'
-                                                                    add_description = False
-                                                                    select_option = False
-
-                                                        elif option == '4':
-
-                                                            add_description = True
-                                                            while add_description:
-                                                                time = input(f'Enter the amount of time you would like to spend on {update}: ')
-                                                                if time.strip() == '':
-                                                                    print('Invalid')
-                                                                else:
-                                                                    # Adds the description of final_time to string
-                                                                    final_time = f'The total time you are spending on {update} is: {time}'
-                                                                    description_info += final_time + '\n'
-                                                                    add_description = False
-                                                                    select_option = False
-
-                                                        elif option == '5':
-
-                                                            add_description = True
-                                                            while add_description:
-                                                                distance = input(f'Enter the distance you wish to cover for {update}: ')
-                                                                if distance.strip() == '':
-                                                                    print('Invalid')
-                                                                else:
-                                                                    # Adds the description of final_distance to string
-                                                                    final_distance = f'The total distance you are covering for {update} is: {distance}'
-                                                                    description_info += final_distance + '\n'
-                                                                    add_description = False
-                                                                    select_option = False
-
-                                                        elif option == '6':
-
-                                                            add_description = True
-                                                            while add_description:
-                                                                time_structure = input(f'Enter the time structure you would like to use for {update}: ')
-                                                                if time_structure.strip() == '':
-                                                                    print('Invalid')
-                                                                else:
-                                                                    # Adds the description of final_time_structure to string
-                                                                    final_time_structure = f'The time structure that you are using for {update} is: {time_structure}'
-                                                                    description_info += final_time_structure + '\n'
-                                                                    add_description = False
-                                                                    select_option = False
-
-                                                        elif option == '7':
-
-                                                            add_description = True
-                                                            while add_description:
-                                                                additional_info = input(f'Enter any additional information you would like to add for {update}: ')
-                                                                if additional_info.strip() == '':
-                                                                    print('Invalid')
-                                                                else:
-                                                                    # Adds the additional information to string
-                                                                    final_info = f'Additional information that was added is: {additional_info}'
-                                                                    description_info += final_info + '\n'
-                                                                    add_description = False
-                                                                    select_option = False
+                                                                print(f'{exercise} already exist in the {routine_name} workout routine')
                                                         else:
-                                                            print('Invalid')
-        
-                                                elif select == '2':
-                                                    WorkoutRoutine.update_workout_description(description_info, routine_name, update)
-                                                    print('\n'+description_info)
-                                                    # WorkoutRoutine.update_workout_description()
-                                                    advance = False
-                                                    exercise_to_update = False
-                                                    exercises = False
-                                                    workout_routine = False
-                                                    category = False
+                                                            print(f'Exercise doesn\'t exist in the {category} category') 
                                                 else:
-                                                    print('Invalid')
-                                    elif change == '3':
-                                        WorkoutRoutine.delete_routine_exercise(routine_name, update)
-                                        advance = False
-                                        exercise_to_update = False
-                                        exercises = False
-                                        workout_routine = False
-                                        category = False
+                                                    print(f'You have no exercises left to add to {routine_name} workout routine')
+                                                    break
+                                            elif change == '2':
+                                                while True:
+                                                
+                                                    exercise = input('Which exercise would you like to update in this workout routine: ')
+                                                    cur.execute('''SELECT COUNT(*) FROM workout_routine 
+                                                                    WHERE workout_routine_name=? AND workout_routine_exercise=?''',
+                                                                    (routine_name, exercise))
+                                                    exercise_exists = cur.fetchone()
+                                                    if exercise_exists[0] > 0:
+                                                        CreateWorkout.choose_own_param(exercise)
+                                                        # Breaks out of outer loop
+                                                        change_routine = False
+                                                        break
+                                                    else:
+                                                        print(f'Exercise doesn\'t exist in the {routine_name} workout routine')
+                                            elif change == '3':
+                                                while True:
+                                                
+                                                    exercise = input('Which exercise would you like to delete from this workout routine: ')
+                                                    cur.execute('''SELECT COUNT(*) FROM workout_routine 
+                                                                    WHERE workout_routine_name=? AND workout_routine_exercise=?''',
+                                                                    (routine_name, exercise))
+                                                    exercise_exists = cur.fetchone()
+                                                    if exercise_exists[0] > 0:
+                                                        WorkoutRoutine.delete_routine_exercise(routine_name, exercise)
+                                                        # Breaks out of outer loop
+                                                        change_routine = False
+                                                        break
+                                                    else:
+                                                        print(f'Exercise doesn\'t exist in the {routine_name} workout routine')
+                                            else:
+                                                print('Invalid input')
+                                        break
                                     else:
-                                        print('Invalid')
+                                        print('Workout routine does not exist')
+                                break    
+                            else:
+                                print(f'{category} category has no workout routines')
+                        else:
+                            print('Exercise category does not exist')
+                else:
+                    print('You have not created a workout routine yet')
+            else:
+                print('You have not created any exercises')
+        else:
+            print('You have not created any exercise categories')
 
     elif option == '11':
 
-        ExerciseCategory.lst_all_categories() # Fetches all the exercise category names from exercise category table
-        WorkoutRoutine.all_routines()       # Appends all workout routines to routines_all_lst
-        unique_routine_list = []
-        if category_lst == []:
-            print('You have no exercise categories')
-        elif routine_lst_all == []:    
-            print('You have no workout routines')
+        # Counts all the exercise categories from exercise_category table
+        cur.execute('''SELECT COUNT(*) FROM exercise_category''')
+        results = cur.fetchone()
+        if results[0] > 0:
+            # Counts all the exercises from exercises table
+            cur.execute('''SELECT COUNT(*) FROM exercises''')
+            exercises_results = cur.fetchone()
+            if exercises_results[0] > 0:
+                # Counts all the workout routines from the workout routine's table
+                cur.execute('''SELECT COUNT(*) FROM workout_routine''')
+                all_routines = cur.fetchone()
+                if all_routines[0] > 0:
+                    while True:
+                        category = input('Which exercise category does the workout routine belong to: ')
+                        # Checks to see if the exercise category exists
+                        cur.execute('''SELECT COUNT(*) FROM exercise_category WHERE exercise_category_name=?''',
+                                    (category,))
+                        category_result = cur.fetchone()
+                        if category_result[0] > 0:
+                            exercise_category_id_result = ExerciseCategory.retrieve_category_id(category)
+                            print(exercise_category_id_result)
+                            # Checks to see if the exercise category has workout routines 
+                            cur.execute('''SELECT COUNT(*) FROM workout_routine WHERE exercise_category_id=?''',
+                                        (exercise_category_id_result,))
+                            has_routines = cur.fetchone()
+                            if has_routines[0] > 0:
+                                while True:
+
+                                    print(f'You have the following workout routines in the {category} exercise category: ')
+                                    # Prints out all the workout routines that the user has in exercise category
+                                    cur.execute('''SELECT workout_routine_name FROM workout_routine
+                                                WHERE exercise_category_id=?''', (exercise_category_id_result,))
+                                    for row in cur:
+                                        print(row[0])
+                                    routine = input('Which routine do you wish to remove: ')
+                                    # Checks to see if workout routine exists in the specified exercise category
+                                    cur.execute('''SELECT COUNT(*) FROM workout_routine WHERE workout_routine_name=?
+                                                AND exercise_category_id=?''', (routine, exercise_category_id_result))
+                                    routine_result = cur.fetchone()
+                                    if routine_result[0] > 0:
+                                        WorkoutRoutine.delete_workout_routine(routine, exercise_category_id_result)
+                                        print(f'{routine} routine successfully deleted')
+                                        break
+                                    else:
+                                        print('Workout routine does not exist')
+                                break
+                            else:
+                                print(f'{category} category has no workout routines')
+                        else:
+                            print('Exercise category does not exist')
+                else:
+                    print('You have not created a workout routine yet')
+            else:
+                print('You have not created any exercises')
         else:
-            delete_condition = True
-            while delete_condition:
-                delete_input = input('Which category does the workout routine you want to delete belong to: ')
-                if not delete_input in category_lst:
-                    print('Exercise category does not exist')
-                else:   
-                    delete_id = ExerciseCategory.retrieve_category_id(delete_input)
-                    WorkoutRoutine.lst_of_routines(delete_id)
-                    if routine_lst == []:
-                        print('Exercise category has no routines')
-                    else:
-                        routine = True
-                        while routine:
-                            print('These are the workout routines you have in the ' + delete_input + ' category: ')
-                            # Appends unique workout routine names to list only
-                            for i in routine_lst:
-                                if not i in unique_routine_list:
-                                    unique_routine_list.append(i)
-                            print(*unique_routine_list, sep='\n')
-                            delete = input('Which of the following workout routines do you wish to delete: ')
-                            if not delete in unique_routine_list:
-                                print('Workout routine does not exist')
-                            else:   
-                                # Deletes chosen routine
-                                WorkoutRoutine.delete_workout_routine(delete)
-                                print('Workout routine successfully deleted')
-                                category_lst.clear()
-                                routine_lst.clear()
-                                routine = False
-                                delete_condition = False
+            print('You have not created any exercise categories')
 
     elif option == '12':   
 
-        FitnessGoal.create_table()
-        ExerciseCategory.lst_all_categories() # Fetches all the exercise category names from exercise category table
+        fitness_goal = True
+        while fitness_goal:
 
-        if category_lst == []:
-            print('You have no exercise categories. Cannot proceed')
-        else:
-            category_condition = True
-            while category_condition:
-                fitness_goal_exercise_category = input('Which exercise category will this fitness goal belong to: ')
-                if not fitness_goal_exercise_category in category_lst:
-                    print('Exercise category does not exist')
-                else:
-                    fitness_condition = True
-                    while fitness_condition:
-                        exercise_category_id_num = ExerciseCategory.retrieve_category_id(fitness_goal_exercise_category)
-                        FitnessGoal.view_fitness_goal_category()
-                        if exercise_category_id_num in category_ids:
-                            print('Exercise category already has a fitness goal. Once goal is completed, you may add another')
-                            break
-                        else:
-                            set_fitness_goal = input('Set a fitness goal for the ' + fitness_goal_exercise_category + ' category: ').strip()
-                            if set_fitness_goal.strip() == '':
-                                print('Invalid input. Please enter a fitness goal')
+            health_goal = input('''
+Enter 1 if you want to set a health goal
+Enter 2 if you want to set a fitness goal
+''')
+            if health_goal == '1':
+                while True:
+
+                    health_fitness_goal = input('Enter your desired health goal: ')
+                    # Checks to see if input is not empty whitespace
+                    if health_fitness_goal.strip() != '':
+                        while True:
+
+                            health_goal_date = input('Enter the date you would like to achieve this health goal: ')
+                            # Checks to see if input is not empty whitespace
+                            if health_goal_date.strip() != '':
+                                # Adds health goal to the database
+                                FitnessGoalHealth.insert_into_goal(health_fitness_goal, health_goal_date)
+                                fitness_goal = False
+                                break
                             else:
-                                while True:
-                                    set_fitness_goal_date = input('Set a date you wish to achieve your fitness goal: ').strip()
-                                    if set_fitness_goal_date == '':
-                                        print('Invalid input. Please enter a date you wish to achieve your fitness goal')
-                                    else:
-                                        FitnessGoal.insert_into_goal(set_fitness_goal, set_fitness_goal_date, exercise_category_id_num)
-                                        fitness_condition = False
-                                        category_condition = False
-                                        break
+                                print('Invalid input')
+                        break
+                    else:
+                        print('Invalid input')
+            elif health_goal == '2':
+                # Counts all the exercise categories from exercise_category table
+                cur.execute('''SELECT COUNT(*) FROM exercise_category''')
+                results = cur.fetchone()
+                if results[0] > 0:
+                    # Counts all the exercises from exercises table
+                    cur.execute('''SELECT COUNT(*) FROM exercises''')
+                    exercises_results = cur.fetchone()
+                    if exercises_results[0] > 0:
+                        while True:
 
+                            exercise_category = input('Which category will this fitness goal belong to: ')
+                            # Checks to see if workout routine exists
+                            cur.execute('''SELECT COUNT(*) FROM exercise_category WHERE exercise_category_name=?''',
+                                        (exercise_category,))
+                            # Fetches the result
+                            category_results = cur.fetchone()
+                            if category_results[0] > 0:
+                                category_id = ExerciseCategory.retrieve_category_id(exercise_category)
+                                # Checks to see if there are exercises in exercise category
+                                cur.execute('''SELECT COUNT(*) FROM exercises WHERE exercise_category_id=?''',
+                                            (category_id,))
+                                # Fetches the result
+                                is_exercises = cur.fetchone()
+                                if is_exercises[0] > 0:
+                                    while True:
+                                        exercise_goal = input(f'Which exercise in the {exercise_category} would you like to create a fitness goal for: ')
+                                        # Checks to see if exercise exists
+                                        cur.execute('''SELECT COUNT(*) FROM exercises WHERE exercise_name=?
+                                                    AND exercise_category_id=?''', (exercise_goal, category_id))
+                                        exercise_exists = cur.fetchone()
+                                        if exercise_exists[0] > 0:
+                                            while True:
+
+                                                fitness_goal_input = input(f'What fitness goal would you like to set for {exercise_goal}: ')
+                                                if fitness_goal_input.strip() != '':
+                                                    while True:
+
+                                                        fitness_goal_date = input('When would you like to achieve this fitness goal: ')
+                                                        if fitness_goal_date.strip() != '':
+                                                            # Adds fitness goal to database
+                                                            FitnessGoal.insert_into_goal(exercise_goal, fitness_goal_input, fitness_goal_date, category_id)
+                                                            print('Fitness goal successfully updated')
+                                                            # Breaks out of loops
+                                                            fitness_goal = False
+                                                            break
+                                                        else:
+                                                            print('Invalid input')
+                                                    break
+                                                else:
+                                                    print('Invalid input')
+                                            break
+                                        else:
+                                            print(f'Exercise does not exist in the {exercise_category} category')
+                                    break
+                                else:
+                                    print('Exercise category does not contain any exercise. Add exercises before creating a workout routine.')
+                            else:
+                                print('Exercise category does not exist')
+                    else:
+                        print('You have not created any exercises')
+                else:
+                    print('You have not created any exercise categories')
+            else:
+                print('Invalid input')
+            
     elif option == '13': 
 
-        # Fetches all the exercise category names from table and stores it in category_lst
-        ExerciseCategory.lst_all_categories()
-        # Stores all exercise category's id's that have a fitness goal in list
-        FitnessGoal.view_fitness_goal_category()
+        fitness_goal = True
+        while fitness_goal:
 
-        if category_lst == []:
-            print('You have no exercise categories. Cannot proceed')
-        elif category_ids == []:
-            print('You have not set a fitness goal. Cannot proceed')
-        else:
-            while True:
-                fitness_goal_input = input('Enter the Exercise Category that this fitness goal belongs to: ')
-                if not fitness_goal_input in category_lst:
-                    print('Exercise category does not exist')
-                elif fitness_goal_input.strip() == '':
-                    print('Invalid input. Enter a valid response')
-                else:
-                    a = ExerciseCategory.retrieve_category_id(fitness_goal_input)
-                    FitnessGoal.view_fitness_goal_category()
-                    if not a in category_ids:
-                        print('Exercise category does not have a fitness goal')
-                    else:
-                        while True: 
-                            print('This is the fitness goal you chose for the ' + fitness_goal_input + ' category:')
-                            FitnessGoal.print_fitness_goal(a)
-                            fitness_goal_progress = input('Enter your fitness goal progress in the ' + fitness_goal_input + ' exercise category: ').strip()
-                            if fitness_goal_progress.strip() == '':
-                                print('Invalid input. Enter a valid response')
-                            else:
+            health_goal_progress = input('''
+Enter 1 if you would like to add progress towards a health goal
+Enter 2 if you would like to add progress towards a fitness goal
+''')
+            if health_goal_progress == '1':
+
+                while True:
+
+                    FitnessGoalHealth.print_out_selection()
+                    # Used to catch incorrect input types from user
+                    try:
+                        select_health_goal = int(input('Enter the id of the health goal you would like to add progress for: '))
+                        # Checks to see if exercise exists
+                        cur.execute('''SELECT COUNT(*) FROM fitness_goal_health WHERE fitness_goal_id=?''',
+                                    (select_health_goal,))
+                        fitness_goal_exist = cur.fetchone()
+                        if fitness_goal_exist[0] > 0:
+                            while True:
+
+                                health_goal_progress = input('Enter your progress for your health goal: ')
+                                if health_goal_progress.strip() != '':
+                                    while True:
+
+                                        health_goal_progress_date = input('Enter the current date to track your progress: ')          
+                                        if health_goal_progress_date.strip() != '':
+                                            # Adds user's progress to the fitness goal
+                                            FitnessGoalHealth.insert_into_goal_progress(health_goal_progress, health_goal_progress_date, select_health_goal)
+                                            fitness_goal = False
+                                            break
+                                        else:
+                                            print('Invalid input')
+                                    break
+                                else:
+                                    print('Invalid input')
+                            break
+                        else:
+                            print('Does not exist')
+                    except ValueError:
+                        print('Invalid input')
+                
+            elif health_goal_progress == '2':
+                # Checks to see if the user has any fitness goals in database
+                cur.execute('''SELECT COUNT(*) FROM fitness_goal''')
+                has_fitness_goal = cur.fetchone()
+                if has_fitness_goal[0] > 0:
+                    while True:
+
+                        FitnessGoal.print_out_selection()
+                        try:
+                            select_fitness_goal = int(input('Enter the number of the fitness goal you want to add progress for: '))
+                            # Checks to see if exercise exists
+                            cur.execute('''SELECT COUNT(*) FROM fitness_goal WHERE fitness_goal_id=?''',
+                                        (select_fitness_goal,))
+                            exercise_exists = cur.fetchone()
+                            if exercise_exists[0] > 0:
                                 while True:
-                                    fitness_goal_date_input = input('Enter the current date: ').strip() 
-                                    if fitness_goal_date_input.strip() == '':
-                                        print('Invalid input. Enter a valid response')
-                                    else:
-                                        # Inserts user progress towards goal into fitness goal table 
-                                        FitnessGoal.insert_into_goal_progress(fitness_goal_progress, fitness_goal_date_input, a)
-                                        category_ids.clear()
+
+                                    # Retrieving the exercise category id of the exercise
+                                    cur.execute('''SELECT fitness_goal_exercise_category FROM fitness_goal
+                                                WHERE fitness_goal_id=?''', (select_fitness_goal,))
+                                    exercise_category_id = cur.fetchone()
+                                    # Fetching the exercise associated with the fitness id
+                                    cur.execute('''SELECT fitness_goal_exercise FROM fitness_goal WHERE
+                                                fitness_goal_id=?''', (select_fitness_goal,))
+                                    exercise = cur.fetchone()
+
+                                    fitness_goal_progress = input(f'Enter the fitness progress you have for {exercise[0]}: ')
+                                    if fitness_goal_progress.strip() != '':
+                                        while True:
+
+                                            fitness_progress_date = input('Enter the current date to track progress: ')
+                                            if fitness_progress_date.strip() != '':
+                                                # Adds user's progress towards the fitness goal
+                                                FitnessGoal.insert_into_goal_progress(fitness_goal_progress, fitness_progress_date, exercise_category_id[0])
+                                                fitness_goal = False
+                                                break
+                                            else:
+                                                print('Invalid input')
                                         break
+                                    else:
+                                        print('Invalid input')
                                 break
-                        break
+                            else:
+                                print('Number is not associated with a fitness goal')
+                        except ValueError:
+                            print('Invalid input')
+                    break
+                else:
+                    print('You have not created any fitness goals')
+            else:
+                print('Invalid input')
 
     elif option == '14': 
 
-        # Fetches all the exercise category names from table
-        ExerciseCategory.lst_all_categories()       
-        # Stores all exercise category's id's that have a fitness goal in list
-        FitnessGoal.view_fitness_goal_category()
+        while True:
 
-        if category_lst == []:
-            print('You have no exercise categories. Cannot proceed')
-        elif category_ids == []:
-            print('You have not set a fitness goal. Cannot proceed')
-        else:
-            while True:
-                fitness_goal_input = input('Enter the Exercise Category that this fitness goal belongs to: ')
-                if not fitness_goal_input in category_lst:
-                    print('Exercise category does not exist')
-                elif fitness_goal_input.strip() == '':
-                    print('Invalid input. Enter a valid response')
+            goal = input('''
+Enter 1 if you wish to view a health goal
+Enter 2 if you wish to view a fitness goal
+''')
+            if goal == '1':
+                # Checks to see if user has set a health goal
+                cur.execute('''SELECT COUNT(*) FROM fitness_goal_health''')
+                health_goal_count = cur.fetchone()
+                if health_goal_count[0] > 0:
+                    # Prints out user's health goals
+                    FitnessGoalHealth.print_out_selection()
                 else:
-                    a = ExerciseCategory.retrieve_category_id(fitness_goal_input)
-                    FitnessGoal.view_fitness_goal_category()
-                    if not a in category_ids:
-                        print('Exercise category does not have a fitness goal')
-                    if a in category_ids:
-                        print()
-                        # Prints out the exercise category's fitness goal
-                        FitnessGoal.view_fitness_goal(a)
-                        break
+                    print('You have not set any health goals')
+                break
+            elif goal == '2':
+                # Checks to see if user has set a fitness goal
+                cur.execute('''SELECT COUNT(*) FROM fitness_goal''')
+                fitness_goal_count = cur.fetchone()
+                if fitness_goal_count[0] > 0:
+                    # Prints out user's health goals
+                    FitnessGoal.print_out_selection()
+                else:
+                    print('You have not set any fitness goals')
+                break
+            else:
+                print('Invalid input')
 
     elif option == '15':    
 
-        # Fetches all the exercise category names from table
-        ExerciseCategory.lst_all_categories()       
-        # Stores all exercise category's id's that have a fitness goal in list
-        FitnessGoal.view_fitness_goal_category()
+        # Over here you really can create a function with parameters. The parameter should include whether the goal is a fitness one or a health one. You really can make these two parts into one. Do the thing you see on AlgoExpert, first call the function before creating it. Define it after you call it.
 
-        if category_lst == []:
-            print('You have no exercise categories. Cannot proceed')
-        elif category_ids == []:
-            print('You have not set a fitness goal. Cannot proceed')
-        else:
-            fitness_goal = True
-            while fitness_goal:
-                fitness_goal_input = input('Enter the Exercise Category that this fitness goal belongs to: ')
-                if not fitness_goal_input in category_lst:
-                    print('Exercise category does not exist')
-                elif fitness_goal_input.strip() == '':
-                    print('Invalid input. Enter a valid response')
-                else:
-                    a = ExerciseCategory.retrieve_category_id(fitness_goal_input)
-                    FitnessGoal.view_fitness_goal_category()
-                    if not a in category_ids:
-                        print('Exercise category does not have a fitness goal')
-                    else:
-                        update = True
-                        while update:
-                            option = input('''
-Enter 1 to change both the fitness goal's description and its achieve date
-Enter 2 to only change the fitness goal's description
-Enter 3 to only change the fitness goal's achieve date
+        goal_update = True
+        while goal_update:
+
+            goal = input('''
+Enter 1 if you wish to update a health goal
+Enter 2 if you wish to update a fitness goal
 ''')
-                            if option == '1':
-                                while True:
-                                    fitness_goal_update = input('Update your fitness goal in the ' + fitness_goal_input + ' category: ').strip()
-                                    if fitness_goal_update.strip() == '':
-                                        print('Invalid input. Enter a valid response')
+            if goal == '1':
+                cur.execute('''SELECT COUNT(*) FROM fitness_goal_health''')
+                is_goal = cur.fetchone()
+                if is_goal[0] > 0:
+                    # Prints out user's health goals
+                    FitnessGoalHealth.print_out_selection()
+                    num = True
+                    while num:
+                        try:
+                            option = int(input('Enter the ID of the health goal you want to update: '))
+                            # Checks to see if health goal exists
+                            cur.execute('''SELECT COUNT(*) FROM fitness_goal_health
+                                        WHERE fitness_goal_id=?''', (option,))
+                            goal_exists = cur.fetchone()
+                            if goal_exists[0] > 0:
+                                update_option = True
+                                while update_option:
+
+                                    update = input('''
+Enter 1 if you wish to update the health goal
+Enter 2 if you wish to update the achieve date
+''')
+                                    if update == '1':
+                                        while True:
+                                            new_health_goal = input('Enter the updated health goal you want to set: ')
+                                            if new_health_goal.strip() != '':
+
+                                                '''Checks to see if user has entered progress for their fitness goal, 
+                                                if yes allows user the option to overwrite their progress'''
+
+                                                cur.execute('''SELECT fitness_goal_progress FROM fitness_goal_health
+                                                            WHERE fitness_goal_id=?''', (option,))
+                                                overwrite_option = cur.fetchone()
+                                                if str(overwrite_option[0]) != 'None':
+                                                    while True:
+                                                        # Allows the user to overwrite the progress they have for the fitness goal
+                                                        overwrite_progress = input('''
+Enter 1 if you wish to overwrite your progress for this fitness goal
+Enter 2 if you do not wish to overwrite your progress for this fitness goal
+''')
+                                                        if overwrite_progress == '1':
+                                                            # Updates users health goal and overwrites progress that user has set
+                                                            FitnessGoalHealth.update_and_overwrite(new_health_goal, option)
+                                                            print('Health goal successfully updated')
+                                                            break
+                                                        elif overwrite_progress == '2':
+                                                            # Updates user's health goal
+                                                            FitnessGoalHealth.update_health_goal(new_health_goal, option)
+                                                            print('Health goal successfully updated')
+                                                            break
+                                                        else:
+                                                            print('Invalid option')
+                                                else:
+                                                    # Updates user's health goal
+                                                    FitnessGoalHealth.update_health_goal(new_health_goal, option)
+                                                    print('Health goal successfully updated')
+                                                # Breaks out of all outer loops
+                                                goal_update = False
+                                                num = False
+                                                update_option = False
+                                                break  
+                                            else:
+                                                print('Invalid')
+                                    elif update == '2':
+
+                                        while True:
+
+                                            new_achieve_date = input('Please enter the health goal\'s new desired date: ')
+                                            if new_achieve_date != '':
+                                                # Updates the health goal with the new date
+                                                FitnessGoalHealth.update_target_date(new_achieve_date, option)
+                                                print('Health goal successfully updated')
+                                                goal_update = False
+                                                num = False
+                                                update_option = False
+                                                break
+                                            else:
+                                                print('Invalid input')
                                     else:
-                                        break
-                                while True:
-                                    new_date = input('Enter the fitness goal\'s new date: ')
-                                    if new_date.strip() == '':
-                                        print('Invalid input. Enter a valid response')
-                                    else:
-                                        # Updates exercise category's fitness goal and achieve date
-                                        FitnessGoal.update_goal_progress_all(fitness_goal_update, new_date, a)
-                                        update = False
-                                        fitness_goal = False
-                                        break
-                            elif option == '2':
-                                while True:
-                                    fitness_goal_update = input('Update your fitness goal in the ' + fitness_goal_input + ' category: ').strip()
-                                    if fitness_goal_update.strip() == '':
-                                        print('Invalid input. Enter a valid response')
-                                    else:
-                                        # Updates the exercise category's fitness goal
-                                        FitnessGoal.update_goal(fitness_goal_update, a)
-                                        update = False
-                                        fitness_goal = False
-                                        break
-                            elif option == '3':
-                                while True:
-                                    new_date = input('Enter the fitness goal\'s new date: ')
-                                    if new_date.strip() == '':
-                                        print('Invalid input. Enter a valid response')
-                                    else:
-                                        # Updates the fitness goal's achieve date
-                                        FitnessGoal.update_goal_date(new_date, a)
-                                        update = False
-                                        fitness_goal = False
-                                        break
+                                        print('Invalid input')
                             else:
-                                print('Invalid response')
-                            
+                                print('Invalid. Input is not associated with a goal')
+                        except ValueError:
+                            print('Invalid input')
+                else:
+                    print('You have not set a health goal yet')
+                    goal_update = False
+            elif goal == '2':
+                # Checks to see if user has created fitness goals
+                cur.execute('''SELECT COUNT(*) FROM fitness_goal''')
+                goal_count = cur.fetchone()
+                if goal_count[0] > 0:
+                    num = True
+                    while num:
+                        # Prints out the users fitness goals for user to choose
+                        FitnessGoal.print_out_selection()
+                        try:
+                            option = int(input('Enter the number of the fitness goal you would like to update: '))
+                            # Checks to see if fitness goal exists
+                            cur.execute('''SELECT COUNT(*) FROM fitness_goal
+                                        WHERE fitness_goal_id=?''', (option,))
+                            goal_exists = cur.fetchone()
+                            if goal_exists[0] > 0:
+                                update_option = True
+                                while update_option:
+
+                                    update = input('''
+Enter 1 if you wish to update the fitness goal
+Enter 2 if you wish to update the achieve date
+''')
+
+
+                                    if update == '1':
+                                        while True:
+                                            new_fitness_goal = input('Enter the updated fitness goal you want to set: ')
+                                            if new_fitness_goal.strip() != '':
+
+                                                '''Checks to see if user has entered progress for their fitness goal, 
+                                                if yes allows user the option to overwrite their progress'''
+
+                                                cur.execute('''SELECT fitness_goal_progress FROM fitness_goal
+                                                            WHERE fitness_goal_id=?''', (option,))
+                                                overwrite_option = cur.fetchone()
+                                                if str(overwrite_option[0]) != 'None':
+                                                    while True:
+                                                        # Allows the user to overwrite the progress they have for the fitness goal
+                                                        overwrite_progress = input('''
+Enter 1 if you wish to overwrite your progress for this fitness goal
+Enter 2 if you do not wish to overwrite your progress for this fitness goal
+''')
+                                                        if overwrite_progress == '1':
+                                                            # Updates and overwrites user's fitness 
+                                                            FitnessGoal.update_and_overwrite(new_fitness_goal, option)
+                                                            print('Fitness goal successfully updated')
+                                                            break
+                                                        elif overwrite_progress == '2':
+                                                            # Updates the user's fitness goal
+                                                            FitnessGoal.update_goal(new_fitness_goal, option)
+                                                            print('Fitness goal successfully updated')
+                                                        else:
+                                                            print('Invalid option')
+                                                else:
+                                                    # Updates the user's fitness goal
+                                                    FitnessGoal.update_goal(new_fitness_goal, option)
+                                                    print('Fitness goal successfully updated')
+                                                # Breaks out of all outer loops
+                                                goal_update = False
+                                                num = False
+                                                update_option = False
+                                                break  
+                                            else:
+                                                print('Invalid')
+                                    elif update == '2':
+
+                                        while True:
+
+                                            new_achieve_date = input('Please enter the revised target date for this goal: ')
+                                            if new_achieve_date != '':
+                                                # Updated the user's fitness goal
+                                                FitnessGoalHealth.update_target_date(new_achieve_date, option)
+                                                print('Fitness goal successfully updated')
+
+                                                goal_update = False
+                                                num = False
+                                                update_option = False
+                                                break
+                                            else:
+                                                print('Invalid input')
+                                    else:
+                                        print('Invalid input')
+
+                            else:
+                                print('ID is not associated with a fitness goal')
+                        except ValueError:
+                            print('Invalid input')
+
+                else:
+                    print('You have not created a fitness goal yet')
+                    # Breaks out of main loop
+                    goal_update = False
+            else:
+                print('Invalid input')         
 
     elif option == '16': 
 
-        # Fetches all the exercise category names from table
-        ExerciseCategory.lst_all_categories()       
-        # Stores all exercise category's id's that have a fitness goal in list
-        FitnessGoal.view_fitness_goal_category()
+        delete = True
+        while delete:
+            fitness_goal = input('''
+Enter 1 if you would like to delete a health goal
+Enter 2 if you would like to delete a fitness goal
+''')
 
-        if category_lst == []:
-            print('You have no exercise categories. Cannot proceed')
-        elif category_ids == []:
-            print('You have not set a fitness goal. Cannot proceed')
-        else:
-            while True:
-                fitness_goal_input = input('Enter the Exercise Category that this fitness goal belongs to: ')
-                if not fitness_goal_input in category_lst:
-                    print('Exercise category does not exist')
-                elif fitness_goal_input.strip() == '':
-                    print('Invalid input. Enter a valid response')
+            if fitness_goal == '1':
+                
+                # Checks to see if user has created a health goal yet
+                cur.execute('''SELECT COUNT(*) FROM fitness_goal_health''')
+                fitness_goal_health_count = cur.fetchone()
+                if fitness_goal_health_count[0] > 0:
+                    while True:
+                        # Prints out the user's fitness goal for user to choose
+                        FitnessGoalHealth.print_out_selection()
+                        try:
+                            option = int(input('Enter the ID of the health goal you want to delete: '))
+                            # Checks to see if health goal exists
+                            cur.execute('''SELECT COUNT(*) FROM fitness_goal_health
+                                        WHERE fitness_goal_id=?''', (option,))
+                            goal_exists = cur.fetchone()
+                            if goal_exists[0] > 0:
+                                # Deletes the health goal
+                                FitnessGoalHealth.delete_goal(option)
+                                delete = False
+                                break
+                            else:
+                                print('Error, ID does not exist')
+                        except ValueError:
+                            print('Invalid input')
                 else:
-                    a = ExerciseCategory.retrieve_category_id(fitness_goal_input)
-                    FitnessGoal.view_fitness_goal_category()
-                    if not a in category_ids:
-                        print('Exercise category does not have a fitness goal')
-                    if a in category_ids:
-                        # Deletes the exercise category's fitness goal
-                        FitnessGoal.delete_fitness_goal(a)
-                        break
+                    print('You have not made a health goal yet.')
+
+            elif fitness_goal == '2':
+                # Checks to see if user has created a fitness goal
+                cur.execute('''SELECT COUNT(*) FROM fitness_goal''')
+                fitness_goal_count = cur.fetchone()
+                if fitness_goal_count[0] > 0:
+                    # Prints out 
+                    FitnessGoal.print_out_selection()
+                    while True:
+                        try:
+                            option = int(input('Enter the number of the fitness goal you want to delete: '))
+                            # Checks to see if fitness goal exists
+                            cur.execute('''SELECT COUNT(*) FROM fitness_goal
+                                        WHERE fitness_goal_id=?''', (option,))
+                            goal_exists = cur.fetchone()
+                            if goal_exists[0] > 0:
+                                # Deletes the fitness goal
+                                FitnessGoal.delete(option)
+                                delete = False
+                                break
+                            else:
+                                print('Invalid input. ID is not associated with a fitness goal')
+                        except ValueError:
+                            print('Invalid input')
+                else:
+                    print('You have not made a fitness goal yet.')
+            else:
+                print('Invalid input. Enter a valid option')
 
     elif option == '17':
 
@@ -1456,20 +1517,3 @@ Enter 3 to only change the fitness goal's achieve date
     
     else:
         print('Invalid.')
-
-
-'''
-References:
-
-I used the following article as a guideline to help me structure my various classes:
-https://codereview.stackexchange.com/questions/182700/python-class-to-manage-a-table-in-sqlite
-
-The following article helped me update multiple columns:
-https://stackoverflow.com/questions/808418/how-to-update-two-columns-in-one-statement
-
-I used the following article to convert a tuple to an integer:
-https://www.geeksforgeeks.org/python-convert-tuple-to-integer/
-
-I Used the following article to elegantly print out the items in a list without using a loop 
-https://stackoverflow.com/questions/37084246/printing-using-list-comprehension
-'''
